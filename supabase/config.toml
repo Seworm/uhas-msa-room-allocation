@@ -1,0 +1,10 @@
+project_id = "YOUR_PROJECT_REF"
+
+[functions.rooms]
+verify_jwt = true
+
+[functions.allocate-room]
+verify_jwt = true
+
+[functions.my-allocation]
+verify_jwt = true
