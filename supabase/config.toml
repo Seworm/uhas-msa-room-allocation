@@ -1,4 +1,4 @@
-project_id = "YOUR_PROJECT_REF"
+project_id = "gepwifrsudifmcjfeugs"
 
 [functions.rooms]
 verify_jwt = true
@@ -8,3 +8,6 @@ verify_jwt = true
 
 [functions.my-allocation]
 verify_jwt = true
+
+[functions.student-login]
+verify_jwt = false

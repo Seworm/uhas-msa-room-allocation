@@ -1,1 +1,86 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>UHAS MSA Room Allocation</title><link rel="stylesheet" href="styles.css"></head><body><main><header><h1>UHAS MSA Room Allocation</h1><p>Self-service accommodation portal</p></header><section id="login"><input id="email" type="email" placeholder="Institutional email"><button id="send">Send sign-in link</button><p id="msg"></p></section><section id="rooms" hidden><h2>Available rooms</h2><div id="grid" class="grid"></div></section><section id="allocation" hidden></section></main><script type="module" src="app.js"></script></body></html>
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta
+    name="viewport"
+    content="width=device-width,initial-scale=1"
+  >
+
+  <title>UHAS MSA Room Allocation</title>
+
+  <link rel="stylesheet" href="styles.css">
+</head>
+
+<body>
+
+<main>
+
+  <header>
+    <h1>UHAS MSA Room Allocation</h1>
+    <p>Student accommodation portal</p>
+  </header>
+
+  <p id="msg" role="status" aria-live="polite"></p>
+
+  <section id="login">
+
+    <h2>Student Access</h2>
+
+    <p>
+      Enter your index number and your unique access code.
+    </p>
+
+    <input
+      id="studentId"
+      type="text"
+      placeholder="Index Number"
+      autocomplete="off"
+    >
+
+    <input
+      id="accessCode"
+      type="password"
+      placeholder="Access Code"
+      autocomplete="current-password"
+      maxlength="12"
+    >
+
+    <button id="activate">
+      Continue
+    </button>
+
+  </section>
+
+  <section id="studentInfo" hidden></section>
+
+  <section id="genderSelection" hidden>
+    <h2>Choose your gender</h2>
+    <p>Your choice determines the rooms you can book and cannot be changed later.</p>
+    <div class="choices">
+      <button type="button" data-gender="MALE">Male</button>
+      <button type="button" data-gender="FEMALE">Female</button>
+    </div>
+  </section>
+
+  <section id="blocks" hidden>
+    <h2>Select a block</h2>
+    <div id="blockGrid" class="grid"></div>
+  </section>
+
+  <section id="rooms" hidden>
+    <h2 id="roomsHeading">Available rooms</h2>
+    <button id="backToBlocks" type="button">← Change block</button>
+
+    <div id="grid" class="grid"></div>
+
+  </section>
+
+  <section id="allocation" hidden></section>
+
+</main>
+
+<script type="module" src="app.js"></script>
+
+</body>
+</html>

@@ -19,13 +19,14 @@ supabase db push
 supabase functions deploy rooms
 supabase functions deploy allocate-room
 supabase functions deploy my-allocation
+supabase functions deploy student-login
 ```
 
 ## 5. Configure Auth
 Use Supabase Auth. For production, prefer institutional email/magic-link or another verified institutional identity flow. Do not use student ID alone as authentication.
 
 ## 6. Load real data
-Import approved students into `public.students`, rooms into `public.rooms`, and beds into `public.beds`. Link each authenticated user to the correct `students.auth_user_id`.
+Import approved students into `public.students`, rooms into `public.rooms`, and beds into `public.beds`. Room imports must use the blocks Ahoe, Bankoe, Dome, and Hliha; supply `gender = 'MALE'` for Dome rooms 31–40 and `gender = 'ALL'` for all other rooms. Each room must have exactly four beds.
 
 ## 7. Configure frontend
 Edit `web/config.js` with the project URL and publishable key, or inject these values through your chosen static-host build process.
