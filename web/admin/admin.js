@@ -12,10 +12,8 @@ const supabase = createClient(
     SUPABASE_PUBLISHABLE_KEY
 );
 
-
 const $ = (selector) =>
     document.querySelector(selector);
-
 
 const loginView = $("#loginView");
 const appView = $("#appView");
@@ -25,6 +23,10 @@ let currentUnallocated = [];
 let currentRooms = [];
 let currentAudit = [];
 
+
+/* ============================================================
+   Utilities
+   ============================================================ */
 
 function showToast(message, type = "") {
 
@@ -41,7 +43,10 @@ function showToast(message, type = "") {
 
 function escapeHtml(value) {
 
-    if (value === null || value === undefined) {
+    if (
+        value === null ||
+        value === undefined
+    ) {
         return "";
     }
 
@@ -56,7 +61,9 @@ function escapeHtml(value) {
 
 function formatDate(value) {
 
-    if (!value) return "—";
+    if (!value) {
+        return "—";
+    }
 
     return new Intl.DateTimeFormat(
         undefined,
@@ -68,6 +75,20 @@ function formatDate(value) {
 }
 
 
+function toNumber(value, fallback = 0) {
+
+    const number = Number(value);
+
+    return Number.isFinite(number)
+        ? number
+        : fallback;
+}
+
+
+/* ============================================================
+   Authentication
+   ============================================================ */
+
 async function getAdminRole() {
 
     const {
@@ -76,7 +97,9 @@ async function getAdminRole() {
     } = await supabase.auth.getUser();
 
     if (error || !user) {
-        throw new Error("Authentication session not found.");
+        throw new Error(
+            "Authentication session not found."
+        );
     }
 
     const {
@@ -89,96 +112,159 @@ async function getAdminRole() {
         .single();
 
     if (profileError || !data) {
-        throw new Error("Administrator profile not found.");
+        throw new Error(
+            "Administrator profile not found."
+        );
     }
 
-    if (!["admin", "super_admin"].includes(data.role)) {
+    if (
+        !["admin", "super_admin"]
+            .includes(data.role)
+    ) {
+
         await supabase.auth.signOut();
-        throw new Error("This account is not authorised for administration.");
+
+        throw new Error(
+            "This account is not authorised for administration."
+        );
     }
 
     return data.role;
 }
 
 
+/* ============================================================
+   RPC helper
+   ============================================================ */
+
 async function rpc(name, args = {}) {
 
     const {
         data,
         error
-    } = await supabase.rpc(name, args);
+    } = await supabase.rpc(
+        name,
+        args
+    );
 
     if (error) {
-        console.error(name, error);
-        throw new Error(error.message || `Unable to load ${name}.`);
+
+        console.error(
+            name,
+            error
+        );
+
+        throw new Error(
+            error.message ||
+            `Unable to load ${name}.`
+        );
     }
 
     return data;
 }
 
 
+/* ============================================================
+   Dashboard
+   ============================================================ */
+
 async function loadDashboard() {
 
-    const summary = await rpc(
-        "admin_dashboard_summary"
-    );
+    const summary =
+        await rpc(
+            "admin_dashboard_summary"
+        );
 
-    /*
-     * The RPC may return either one object or one row.
-     */
-    const row = Array.isArray(summary)
-        ? summary[0]
-        : summary;
+    if (!summary) {
 
-    if (!row) {
-        throw new Error("Dashboard summary returned no data.");
+        throw new Error(
+            "Dashboard summary returned no data."
+        );
     }
 
+    /*
+     * admin_dashboard_summary() returns:
+     *
+     * {
+     *   students: {...},
+     *   rooms: {...},
+     *   beds: {...},
+     *   holds: {...},
+     *   allocations: {...},
+     *   gender: {...},
+     *   allocation_open: true/false
+     * }
+     */
+
+    const students =
+        summary.students || {};
+
+    const rooms =
+        summary.rooms || {};
+
+    const beds =
+        summary.beds || {};
+
+    const holds =
+        summary.holds || {};
+
+    const allocations =
+        summary.allocations || {};
+
     $("#totalRooms").textContent =
-        row.total_rooms ?? row.rooms ?? "0";
+        toNumber(rooms.total);
 
     $("#totalBeds").textContent =
-        row.total_beds ?? row.beds ?? "0";
+        toNumber(beds.total);
 
     $("#occupiedBeds").textContent =
-        row.occupied_beds ?? row.occupied ?? "0";
+        toNumber(beds.occupied);
 
     $("#availableBeds").textContent =
-        row.available_beds ?? row.available ?? "0";
+        toNumber(beds.available);
 
     $("#activeHolds").textContent =
-        row.active_holds ?? row.holds ?? "0";
+        toNumber(holds.active);
 
     $("#activeAllocations").textContent =
-        row.active_allocations ?? row.allocations ?? "0";
+        toNumber(
+            allocations.active ??
+            students.allocated
+        );
 
     $("#unallocatedStudents").textContent =
-        row.unallocated_eligible_students ??
-        row.unallocated_students ??
-        "0";
+        toNumber(students.unallocated);
 
-    const open =
-        row.allocation_open ??
-        row.is_allocation_open;
+    const allocationOpen =
+        summary.allocation_open === true;
 
     $("#allocationStatus").textContent =
-        open === true ? "OPEN" : "CLOSED";
+        allocationOpen
+            ? "OPEN"
+            : "CLOSED";
 
     $("#lastUpdated").textContent =
         `Updated ${new Date().toLocaleTimeString()}`;
 }
 
 
+/* ============================================================
+   Rooms
+   ============================================================ */
+
 async function loadRooms() {
 
-    const block = $("#blockFilter").value;
+    const block =
+        $("#blockFilter").value;
 
-    currentRooms = await rpc(
-        "admin_rooms",
-        {
-            p_block: block || null
-        }
-    );
+    currentRooms =
+        await rpc(
+            "admin_rooms",
+            {
+                p_block:
+                    block || null
+            }
+        );
 
     renderRooms();
 }
@@ -186,103 +272,138 @@ async function loadRooms() {
 
 function renderRooms() {
 
-    const container = $("#roomsGrid");
+    const container =
+        $("#roomsGrid");
 
-    if (!currentRooms.length) {
+    if (!currentRooms?.length) {
+
         container.innerHTML = `
             <div class="empty-state">
                 No rooms found.
             </div>
         `;
+
         return;
     }
 
-    container.innerHTML = currentRooms.map(room => {
+    container.innerHTML =
+        currentRooms.map(room => {
 
-        const capacity =
-            Number(room.capacity ?? 0);
+            const capacity =
+                toNumber(room.capacity);
 
-        const occupied =
-            Number(
-                room.occupied_beds ??
-                room.occupied ??
-                0
-            );
+            const occupied =
+                toNumber(
+                    room.occupied_beds
+                );
 
-        const available =
-            Number(
-                room.available_beds ??
-                Math.max(capacity - occupied, 0)
-            );
+            const available =
+                toNumber(
+                    room.available_beds,
+                    Math.max(
+                        capacity - occupied,
+                        0
+                    )
+                );
 
-        const percent =
-            capacity
-                ? Math.round((occupied / capacity) * 100)
-                : 0;
+            const percent =
+                toNumber(
+                    room.occupancy_percent,
+                    capacity
+                        ? Math.round(
+                            (occupied / capacity) * 100
+                        )
+                        : 0
+                );
 
-        const gender =
-            room.gender ||
-            "Neutral";
+            const gender =
+                room.room_gender ||
+                "Neutral";
 
-        const locked =
-            room.temporarily_locked === true ||
-            room.bookable === false;
+            const locked =
+                room.temporarily_locked === true ||
+                room.bookable === false;
 
-        return `
-            <button
-                class="room-card"
-                data-room-id="${escapeHtml(room.id)}"
-            >
+            /*
+             * IMPORTANT:
+             * RPC returns room_id, not id.
+             */
+            const roomId =
+                room.room_id;
 
-                <div class="room-card-top">
+            return `
+                <button
+                    class="room-card"
+                    data-room-id="${escapeHtml(roomId)}"
+                >
 
-                    <span class="room-code">
-                        ${escapeHtml(room.room_code)}
-                    </span>
+                    <div class="room-card-top">
 
-                    <span class="room-gender">
-                        ${escapeHtml(gender)}
-                    </span>
+                        <span class="room-code">
+                            ${escapeHtml(
+                                room.room_code
+                            )}
+                        </span>
 
-                </div>
+                        <span class="room-gender">
+                            ${escapeHtml(gender)}
+                        </span>
 
-                <div class="room-number">
-                    Room ${escapeHtml(room.room_number)}
-                </div>
+                    </div>
 
-                <div class="room-meta">
-                    ${escapeHtml(room.block)}
-                    · ${escapeHtml(room.floor ?? "")}
-                </div>
+                    <div class="room-number">
+                        Room ${escapeHtml(
+                            room.room_number
+                        )}
+                    </div>
 
-                <div class="progress">
-                    <span style="width:${percent}%"></span>
-                </div>
+                    <div class="room-meta">
+                        ${escapeHtml(
+                            room.block
+                        )}
+                        ·
+                        ${escapeHtml(
+                            room.floor ?? ""
+                        )}
+                    </div>
 
-                <div class="room-footer">
+                    <div class="progress">
+                        <span
+                            style="width:${Math.min(
+                                Math.max(percent, 0),
+                                100
+                            )}%"
+                        ></span>
+                    </div>
 
-                    <span>
-                        ${occupied}/${capacity} occupied
-                    </span>
+                    <div class="room-footer">
 
-                    <span>
-                        ${available} available
-                    </span>
+                        <span>
+                            ${occupied}/${capacity}
+                            occupied
+                        </span>
 
-                </div>
+                        <span>
+                            ${available}
+                            available
+                        </span>
 
-                ${
-                    locked
-                        ? `<div class="room-status locked">
-                            Locked
-                           </div>`
-                        : ""
-                }
+                    </div>
 
-            </button>
-        `;
+                    ${
+                        locked
+                            ? `
+                                <div class="room-status locked">
+                                    Locked
+                                </div>
+                            `
+                            : ""
+                    }
 
-    }).join("");
+                </button>
+            `;
+
+        }).join("");
 
     document
         .querySelectorAll(".room-card")
@@ -290,12 +411,19 @@ function renderRooms() {
 
             card.addEventListener(
                 "click",
-                () => openRoom(card.dataset.roomId)
+                () =>
+                    openRoom(
+                        card.dataset.roomId
+                    )
             );
 
         });
 }
 
+
+/* ============================================================
+   Room occupants
+   ============================================================ */
 
 async function openRoom(roomId) {
 
@@ -303,28 +431,36 @@ async function openRoom(roomId) {
 
         const room =
             currentRooms.find(
-                item => String(item.id) === String(roomId)
+                item =>
+                    String(item.room_id) ===
+                    String(roomId)
             );
 
         const occupants =
             await rpc(
                 "admin_room_occupants",
                 {
-                    p_room_id: roomId
+                    p_room_id:
+                        roomId
                 }
             );
 
         $("#modalRoomTitle").textContent =
-            room?.room_code || "Room";
+            room?.room_code ||
+            "Room";
 
         $("#modalRoomSubtitle").textContent =
             room
                 ? `${room.block} · Room ${room.room_number}`
                 : "";
 
-        renderOccupants(occupants);
+        renderOccupants(
+            occupants
+        );
 
-        $("#roomModal").classList.remove("hidden");
+        $("#roomModal")
+            .classList
+            .remove("hidden");
 
     } catch (error) {
 
@@ -332,14 +468,14 @@ async function openRoom(roomId) {
             error.message,
             "error"
         );
-
     }
 }
 
 
 function renderOccupants(occupants) {
 
-    const container = $("#roomOccupants");
+    const container =
+        $("#roomOccupants");
 
     if (!occupants?.length) {
 
@@ -352,37 +488,64 @@ function renderOccupants(occupants) {
         return;
     }
 
-    container.innerHTML = occupants.map(student => `
-        <div class="occupant-card">
+    container.innerHTML =
+        occupants.map(student => `
 
-            <div class="occupant-bed">
-                Bed ${escapeHtml(student.bed_number)}
-            </div>
+            <div class="occupant-card">
 
-            <div>
-                <strong>
-                    ${escapeHtml(student.student_name)}
-                </strong>
-
-                <div class="muted">
-                    ${escapeHtml(student.student_id)}
+                <div class="occupant-bed">
+                    Bed ${escapeHtml(
+                        student.bed_number
+                    )}
                 </div>
 
-                <div class="muted">
-                    ${escapeHtml(student.level ?? "")}
-                    ·
-                    ${escapeHtml(student.programme ?? "")}
+                <div>
+
+                    <strong>
+                        ${escapeHtml(
+                            student.student_name
+                        )}
+                    </strong>
+
+                    <div class="muted">
+                        ${escapeHtml(
+                            student.student_id
+                        )}
+                    </div>
+
+                    <div class="muted">
+                        ${escapeHtml(
+                            student.level ?? ""
+                        )}
+                        ·
+                        ${escapeHtml(
+                            student.programme ?? ""
+                        )}
+                    </div>
+
+                    <div class="muted">
+                        ${escapeHtml(
+                            student.email ?? ""
+                        )}
+                    </div>
+
                 </div>
+
+                <div class="occupant-gender">
+                    ${escapeHtml(
+                        student.gender ?? "—"
+                    )}
+                </div>
+
             </div>
 
-            <div class="occupant-gender">
-                ${escapeHtml(student.gender ?? "—")}
-            </div>
-
-        </div>
-    `).join("");
+        `).join("");
 }
 
+
+/* ============================================================
+   Student allocations
+   ============================================================ */
 
 async function loadAllocations() {
 
@@ -391,13 +554,17 @@ async function loadAllocations() {
             "admin_student_allocations",
             {
                 p_search:
-                    $("#studentSearch").value.trim() || null,
+                    $("#studentSearch")
+                        .value
+                        .trim() || null,
 
                 p_block:
-                    $("#allocationBlockFilter").value || null,
+                    $("#allocationBlockFilter")
+                        .value || null,
 
                 p_gender:
-                    $("#genderFilter").value || null
+                    $("#genderFilter")
+                        .value || null
             }
         );
 
@@ -431,25 +598,35 @@ function renderAllocations() {
             <tr>
 
                 <td>
-                    ${escapeHtml(row.student_id)}
+                    ${escapeHtml(
+                        row.student_id
+                    )}
                 </td>
 
                 <td>
                     <strong>
-                        ${escapeHtml(row.student_name)}
+                        ${escapeHtml(
+                            row.student_name
+                        )}
                     </strong>
                 </td>
 
                 <td>
-                    ${escapeHtml(row.level ?? "—")}
+                    ${escapeHtml(
+                        row.level ?? "—"
+                    )}
                 </td>
 
                 <td>
-                    ${escapeHtml(row.gender ?? "—")}
+                    ${escapeHtml(
+                        row.gender ?? "—"
+                    )}
                 </td>
 
                 <td>
-                    ${escapeHtml(row.block ?? "—")}
+                    ${escapeHtml(
+                        row.block ?? "—"
+                    )}
                 </td>
 
                 <td>
@@ -461,12 +638,15 @@ function renderAllocations() {
                 </td>
 
                 <td>
-                    ${escapeHtml(row.bed_number ?? "—")}
+                    ${escapeHtml(
+                        row.bed_number ?? "—"
+                    )}
                 </td>
 
                 <td>
                     ${escapeHtml(
-                        row.allocation_number ?? "—"
+                        row.allocation_number ??
+                        "—"
                     )}
                 </td>
 
@@ -475,6 +655,10 @@ function renderAllocations() {
         `).join("");
 }
 
+
+/* ============================================================
+   Unallocated students
+   ============================================================ */
 
 async function loadUnallocated() {
 
@@ -519,29 +703,41 @@ function renderUnallocated() {
             <tr>
 
                 <td>
-                    ${escapeHtml(row.student_id)}
+                    ${escapeHtml(
+                        row.student_id
+                    )}
                 </td>
 
                 <td>
                     <strong>
-                        ${escapeHtml(row.student_name)}
+                        ${escapeHtml(
+                            row.student_name
+                        )}
                     </strong>
                 </td>
 
                 <td>
-                    ${escapeHtml(row.level ?? "—")}
+                    ${escapeHtml(
+                        row.level ?? "—"
+                    )}
                 </td>
 
                 <td>
-                    ${escapeHtml(row.programme ?? "—")}
+                    ${escapeHtml(
+                        row.programme ?? "—"
+                    )}
                 </td>
 
                 <td>
-                    ${escapeHtml(row.gender ?? "—")}
+                    ${escapeHtml(
+                        row.gender ?? "—"
+                    )}
                 </td>
 
                 <td>
-                    ${escapeHtml(row.email ?? "—")}
+                    ${escapeHtml(
+                        row.email ?? "—"
+                    )}
                 </td>
 
             </tr>
@@ -549,6 +745,10 @@ function renderUnallocated() {
         `).join("");
 }
 
+
+/* ============================================================
+   Audit logs
+   ============================================================ */
 
 async function loadAudit() {
 
@@ -591,18 +791,24 @@ function renderAudit() {
 
                 <td>
                     ${escapeHtml(
-                        formatDate(row.created_at)
+                        formatDate(
+                            row.created_at
+                        )
                     )}
                 </td>
 
                 <td>
                     <span class="action-badge">
-                        ${escapeHtml(row.action)}
+                        ${escapeHtml(
+                            row.action
+                        )}
                     </span>
                 </td>
 
                 <td>
-                    ${escapeHtml(row.entity)}
+                    ${escapeHtml(
+                        row.entity
+                    )}
                 </td>
 
                 <td>
@@ -626,6 +832,10 @@ function renderAudit() {
         `).join("");
 }
 
+
+/* ============================================================
+   Load everything
+   ============================================================ */
 
 async function loadEverything() {
 
@@ -651,6 +861,10 @@ async function loadEverything() {
 }
 
 
+/* ============================================================
+   CSV export
+   ============================================================ */
+
 function csvEscape(value) {
 
     const text =
@@ -659,11 +873,17 @@ function csvEscape(value) {
             ? ""
             : String(value);
 
-    return `"${text.replaceAll('"', '""')}"`;
+    return `"${text.replaceAll(
+        '"',
+        '""'
+    )}"`;
 }
 
 
-function downloadCsv(filename, rows) {
+function downloadCsv(
+    filename,
+    rows
+) {
 
     if (!rows?.length) {
 
@@ -679,19 +899,28 @@ function downloadCsv(filename, rows) {
         Object.keys(rows[0]);
 
     const csv = [
-        headers.map(csvEscape).join(","),
+        headers
+            .map(csvEscape)
+            .join(","),
+
         ...rows.map(row =>
             headers
-                .map(key => csvEscape(row[key]))
+                .map(key =>
+                    csvEscape(
+                        row[key]
+                    )
+                )
                 .join(",")
         )
+
     ].join("\r\n");
 
     const blob =
         new Blob(
             [csv],
             {
-                type: "text/csv;charset=utf-8;"
+                type:
+                    "text/csv;charset=utf-8;"
             }
         );
 
@@ -704,40 +933,55 @@ function downloadCsv(filename, rows) {
     link.href = url;
     link.download = filename;
 
-    document.body.appendChild(link);
+    document
+        .body
+        .appendChild(link);
+
     link.click();
+
     link.remove();
 
     URL.revokeObjectURL(url);
 }
 
 
+/* ============================================================
+   Login
+   ============================================================ */
+
 async function signIn(event) {
 
     event.preventDefault();
 
     const email =
-        $("#email").value.trim();
+        $("#email")
+            .value
+            .trim();
 
     const password =
-        $("#password").value;
+        $("#password")
+            .value;
 
     const button =
         $("#loginButton");
 
-    $("#loginError").textContent = "";
+    $("#loginError")
+        .textContent = "";
 
     button.disabled = true;
-    button.textContent = "Signing in…";
+    button.textContent =
+        "Signing in…";
 
     try {
 
         const {
             error
-        } = await supabase.auth.signInWithPassword({
-            email,
-            password
-        });
+        } =
+            await supabase.auth
+                .signInWithPassword({
+                    email,
+                    password
+                });
 
         if (error) {
             throw error;
@@ -746,13 +990,19 @@ async function signIn(event) {
         const role =
             await getAdminRole();
 
-        $("#adminRole").textContent =
+        $("#adminRole")
+            .textContent =
             role === "super_admin"
                 ? "SUPER ADMIN"
                 : "ADMIN";
 
-        loginView.classList.add("hidden");
-        appView.classList.remove("hidden");
+        loginView
+            .classList
+            .add("hidden");
+
+        appView
+            .classList
+            .remove("hidden");
 
         await loadEverything();
 
@@ -760,7 +1010,8 @@ async function signIn(event) {
 
         console.error(error);
 
-        $("#loginError").textContent =
+        $("#loginError")
+            .textContent =
             error.message ||
             "Unable to sign in.";
 
@@ -769,7 +1020,9 @@ async function signIn(event) {
     } finally {
 
         button.disabled = false;
-        button.textContent = "Sign in";
+
+        button.textContent =
+            "Sign in";
     }
 }
 
@@ -778,12 +1031,22 @@ async function signOut() {
 
     await supabase.auth.signOut();
 
-    appView.classList.add("hidden");
-    loginView.classList.remove("hidden");
+    appView
+        .classList
+        .add("hidden");
 
-    $("#password").value = "";
+    loginView
+        .classList
+        .remove("hidden");
+
+    $("#password")
+        .value = "";
 }
 
+
+/* ============================================================
+   Initialisation
+   ============================================================ */
 
 async function initialise() {
 
@@ -791,7 +1054,9 @@ async function initialise() {
         data: {
             session
         }
-    } = await supabase.auth.getSession();
+    } =
+        await supabase.auth
+            .getSession();
 
     if (!session) {
         return;
@@ -802,13 +1067,19 @@ async function initialise() {
         const role =
             await getAdminRole();
 
-        $("#adminRole").textContent =
+        $("#adminRole")
+            .textContent =
             role === "super_admin"
                 ? "SUPER ADMIN"
                 : "ADMIN";
 
-        loginView.classList.add("hidden");
-        appView.classList.remove("hidden");
+        loginView
+            .classList
+            .add("hidden");
+
+        appView
+            .classList
+            .remove("hidden");
 
         await loadEverything();
 
@@ -820,6 +1091,10 @@ async function initialise() {
     }
 }
 
+
+/* ============================================================
+   Event listeners
+   ============================================================ */
 
 $("#loginForm")
     .addEventListener(
@@ -872,13 +1147,19 @@ $("#unallocatedSearch")
 $("#closeModal")
     .addEventListener(
         "click",
-        () => $("#roomModal").classList.add("hidden")
+        () =>
+            $("#roomModal")
+                .classList
+                .add("hidden")
     );
 
 $(".modal-backdrop")
     .addEventListener(
         "click",
-        () => $("#roomModal").classList.add("hidden")
+        () =>
+            $("#roomModal")
+                .classList
+                .add("hidden")
     );
 
 $("#exportAllocations")
@@ -904,7 +1185,8 @@ $("#exportUnallocated")
 $("#printReport")
     .addEventListener(
         "click",
-        () => window.print()
+        () =>
+            window.print()
     );
 
 
