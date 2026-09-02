@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
+
+    <title>Asogli Hall Administration</title>
+
+    <link rel="stylesheet" href="./admin.css">
+
+    <script type="module" src="./admin.js"></script>
+</head>
+
+<body>
+
+<div id="loginView" class="screen">
+
+    <div class="login-card">
+
+        <div class="brand-mark">
+            AH
+        </div>
+
+        <p class="eyebrow">ADMINISTRATION PORTAL</p>
+
+        <h1>Asogli Hall</h1>
+
+        <p class="login-subtitle">
+            Secure room allocation administration
+        </p>
+
+        <form id="loginForm">
+
+            <label for="email">Email address</label>
+            <input
+                id="email"
+                type="email"
+                autocomplete="username"
+                placeholder="Administrator email"
+                required
+            >
+
+            <label for="password">Password</label>
+
+            <input
+                id="password"
+                type="password"
+                autocomplete="current-password"
+                placeholder="Password"
+                required
+            >
+
+            <button type="submit" id="loginButton">
+                Sign in
+            </button>
+
+            <p id="loginError" class="error"></p>
+
+        </form>
+
+    </div>
+
+</div>
+
+
+<div id="appView" class="app hidden">
+
+    <header class="topbar">
+
+        <div>
+            <div class="brand">Asogli Hall</div>
+            <div class="brand-subtitle">
+                Administration Portal
+            </div>
+        </div>
+
+        <div class="topbar-actions">
+
+            <span id="adminRole" class="role-badge"></span>
+
+            <button id="refreshButton" class="secondary-button">
+                Refresh
+            </button>
+
+            <button id="logoutButton" class="secondary-button">
+                Sign out
+            </button>
+
+        </div>
+
+    </header>
+
+
+    <main class="container">
+
+        <section class="page-heading">
+
+            <div>
+                <p class="eyebrow">OVERVIEW</p>
+
+                <h1>Allocation dashboard</h1>
+
+                <p>
+                    Monitor rooms, beds, students and allocation activity.
+                </p>
+            </div>
+
+            <div id="lastUpdated" class="muted"></div>
+
+        </section>
+
+
+        <section class="stats-grid">
+
+            <article class="stat-card">
+                <span>Total rooms</span>
+                <strong id="totalRooms">—</strong>
+            </article>
+
+            <article class="stat-card">
+                <span>Total beds</span>
+                <strong id="totalBeds">—</strong>
+            </article>
+
+            <article class="stat-card">
+                <span>Occupied beds</span>
+                <strong id="occupiedBeds">—</strong>
+            </article>
+
+            <article class="stat-card">
+                <span>Available beds</span>
+                <strong id="availableBeds">—</strong>
+            </article>
+
+            <article class="stat-card">
+                <span>Active holds</span>
+                <strong id="activeHolds">—</strong>
+            </article>
+
+            <article class="stat-card">
+                <span>Active allocations</span>
+                <strong id="activeAllocations">—</strong>
+            </article>
+
+            <article class="stat-card">
+                <span>Unallocated eligible</span>
+                <strong id="unallocatedStudents">—</strong>
+            </article>
+
+            <article class="stat-card">
+                <span>Allocation status</span>
+                <strong id="allocationStatus">—</strong>
+            </article>
+
+        </section>
+
+
+        <section class="panel">
+
+            <div class="panel-heading">
+
+                <div>
+                    <h2>Rooms</h2>
+                    <p>Click a room to inspect its occupants.</p>
+                </div>
+
+                <select id="blockFilter">
+                    <option value="">All blocks</option>
+                    <option value="Ahoe">Ahoe</option>
+                    <option value="Bankoe">Bankoe</option>
+                    <option value="Dome">Dome</option>
+                    <option value="Hliha">Hliha</option>
+                </select>
+
+            </div>
+
+            <div id="roomsGrid" class="rooms-grid"></div>
+
+        </section>
+
+
+        <section class="panel">
+
+            <div class="panel-heading">
+
+                <div>
+                    <h2>Student allocations</h2>
+                    <p>Search confirmed room assignments.</p>
+                </div>
+
+                <div class="filters">
+
+                    <input
+                        id="studentSearch"
+                        type="search"
+                        placeholder="Search student, index or email"
+                    >
+
+                    <select id="genderFilter">
+                        <option value="">All genders</option>
+                        <option value="Male">Male</option>
+                        <option value="Female">Female</option>
+                    </select>
+
+                    <select id="allocationBlockFilter">
+                        <option value="">All blocks</option>
+                        <option value="Ahoe">Ahoe</option>
+                        <option value="Bankoe">Bankoe</option>
+                        <option value="Dome">Dome</option>
+                        <option value="Hliha">Hliha</option>
+                    </select>
+
+                </div>
+
+            </div>
+
+            <div class="table-wrapper">
+
+                <table>
+
+                    <thead>
+                        <tr>
+                            <th>Student ID</th>
+                            <th>Name</th>
+                            <th>Level</th>
+                            <th>Gender</th>
+                            <th>Block</th>
+                            <th>Room</th>
+                            <th>Bed</th>
+                            <th>Allocation</th>
+                        </tr>
+                    </thead>
+
+                    <tbody id="allocationsTable"></tbody>
+
+                </table>
+
+            </div>
+
+        </section>
+
+
+        <section class="panel">
+
+            <div class="panel-heading">
+
+                <div>
+                    <h2>Unallocated students</h2>
+                    <p>Eligible students without an active allocation.</p>
+                </div>
+
+                <input
+                    id="unallocatedSearch"
+                    type="search"
+                    placeholder="Search students"
+                >
+
+            </div>
+
+            <div class="table-wrapper">
+
+                <table>
+
+                    <thead>
+                        <tr>
+                            <th>Student ID</th>
+                            <th>Name</th>
+                            <th>Level</th>
+                            <th>Programme</th>
+                            <th>Gender</th>
+                            <th>Email</th>
+                        </tr>
+                    </thead>
+
+                    <tbody id="unallocatedTable"></tbody>
+
+                </table>
+
+            </div>
+
+        </section>
+
+
+        <section class="panel">
+
+            <div class="panel-heading">
+
+                <div>
+                    <h2>Audit log</h2>
+                    <p>Recent allocation and system activity.</p>
+                </div>
+
+            </div>
+
+            <div class="table-wrapper">
+
+                <table>
+
+                    <thead>
+                        <tr>
+                            <th>Time</th>
+                            <th>Action</th>
+                            <th>Entity</th>
+                            <th>Entity ID</th>
+                            <th>Details</th>
+                        </tr>
+                    </thead>
+
+                    <tbody id="auditTable"></tbody>
+
+                </table>
+
+            </div>
+
+        </section>
+
+
+        <section class="panel report-panel">
+
+            <div class="panel-heading">
+
+                <div>
+                    <h2>Reports</h2>
+                    <p>Export the current allocation information.</p>
+                </div>
+
+                <div class="report-actions">
+
+                    <button id="exportAllocations" class="secondary-button">
+                        Export allocations CSV
+                    </button>
+
+                    <button id="exportUnallocated" class="secondary-button">
+                        Export unallocated CSV
+                    </button>
+
+                    <button id="printReport" class="secondary-button">
+                        Print report
+                    </button>
+
+                </div>
+
+            </div>
+
+        </section>
+
+    </main>
+
+</div>
+
+
+<div id="roomModal" class="modal hidden">
+
+    <div class="modal-backdrop"></div>
+
+    <div class="modal-card">
+
+        <div class="modal-header">
+
+            <div>
+                <p class="eyebrow">ROOM DETAILS</p>
+                <h2 id="modalRoomTitle">Room</h2>
+                <p id="modalRoomSubtitle"></p>
+            </div>
+
+            <button id="closeModal" class="close-button">
+                ×
+            </button>
+
+        </div>
+
+        <div id="roomOccupants" class="occupants"></div>
+
+    </div>
+
+</div>
+
+
+<div id="toast" class="toast"></div>
+
+</body>
+</html>
