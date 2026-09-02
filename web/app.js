@@ -12,6 +12,12 @@ const supabase = createClient(
 );
 
 
+// ==================================================
+// UHAS ASOGLI HALL ROOM ALLOCATION
+// Frontend application controller
+// ==================================================
+
+
 // --------------------------------------------------
 // DOM ELEMENTS
 // --------------------------------------------------
@@ -70,15 +76,61 @@ let holdTimer = null;
 
 
 // --------------------------------------------------
+// APPLICATION BRANDING
+// --------------------------------------------------
+
+function applyBranding() {
+
+  document.title =
+    'UHAS Asogli Hall Room Allocation';
+
+  const brandElements =
+    document.querySelectorAll(
+      '[data-brand], .brand-name, .site-title'
+    );
+
+  brandElements.forEach(element => {
+    element.textContent =
+      'UHAS Asogli Hall Room Allocation';
+  });
+
+  const msaElements =
+    document.querySelectorAll(
+      '*'
+    );
+
+  msaElements.forEach(element => {
+
+    if (
+      element.children.length === 0 &&
+      element.textContent.includes('UHAS MSA Room Allocation')
+    ) {
+      element.textContent =
+        element.textContent.replace(
+          /UHAS MSA Room Allocation/g,
+          'UHAS Asogli Hall Room Allocation'
+        );
+    }
+
+  });
+}
+
+
+// --------------------------------------------------
 // HELPERS
 // --------------------------------------------------
 
 function showMessage(text, type = '') {
+
+  if (!msg) return;
+
   msg.textContent = text;
   msg.className = type;
 }
 
+
 function escapeHtml(value) {
+
   return String(value ?? '')
     .replaceAll('&', '&amp;')
     .replaceAll('<', '&lt;')
@@ -87,29 +139,163 @@ function escapeHtml(value) {
     .replaceAll("'", '&#039;');
 }
 
+
 function normalizeGender(value) {
+
   return String(value ?? '')
     .trim()
     .toUpperCase();
 }
 
+
 function showSection(section) {
-  genderSection.hidden = true;
-  blockSection.hidden = true;
-  roomsSection.hidden = true;
-  allocationSection.hidden = true;
+
+  [
+    genderSection,
+    blockSection,
+    roomsSection,
+    allocationSection
+  ].forEach(element => {
+
+    if (element) {
+      element.hidden = true;
+    }
+
+  });
 
   if (section) {
     section.hidden = false;
   }
 }
 
+
 function disableButtons(selector, disabled) {
+
   document
     .querySelectorAll(selector)
     .forEach(button => {
       button.disabled = disabled;
     });
+}
+
+
+function setLoading(button, loading, text = 'Loading...') {
+
+  if (!button) return;
+
+  if (loading) {
+
+    button.dataset.originalText =
+      button.textContent;
+
+    button.disabled = true;
+
+    button.innerHTML =
+      `<span class="button-spinner" aria-hidden="true"></span>${escapeHtml(text)}`;
+
+  } else {
+
+    button.disabled = false;
+
+    button.textContent =
+      button.dataset.originalText ||
+      button.textContent;
+
+  }
+}
+
+
+// --------------------------------------------------
+// APPLICATION HEADER
+// --------------------------------------------------
+
+function createApplicationHeader() {
+
+  if (
+    document.querySelector('.app-brand-header')
+  ) {
+    return;
+  }
+
+  const header =
+    document.createElement('div');
+
+  header.className =
+    'app-brand-header';
+
+  header.innerHTML = `
+
+    <div class="app-brand-mark">
+      <div class="brand-monogram">UHAS</div>
+
+      <div class="brand-copy">
+        <strong>Asogli Hall</strong>
+        <span>Room Allocation</span>
+      </div>
+    </div>
+
+    <div class="brand-status">
+      <span class="status-dot"></span>
+      Accommodation Portal
+    </div>
+
+  `;
+
+  document.body.prepend(header);
+}
+
+
+// --------------------------------------------------
+// PROGRESS INDICATOR
+// --------------------------------------------------
+
+function updateProgress(step) {
+
+  let progress =
+    document.querySelector('.allocation-progress');
+
+  if (!progress) {
+
+    progress =
+      document.createElement('div');
+
+    progress.className =
+      'allocation-progress';
+
+    document.body.appendChild(progress);
+
+  }
+
+  const steps = [
+    ['01', 'Sign in'],
+    ['02', 'Your details'],
+    ['03', 'Choose block'],
+    ['04', 'Choose room'],
+    ['05', 'Confirm']
+  ];
+
+  progress.innerHTML =
+    steps.map((item, index) => {
+
+      const number = index + 1;
+
+      let state = '';
+
+      if (number < step) {
+        state = 'completed';
+      } else if (number === step) {
+        state = 'active';
+      }
+
+      return `
+        <div class="progress-step ${state}">
+          <span>${item[0]}</span>
+          <label>${item[1]}</label>
+        </div>
+      `;
+
+    }).join('');
+
 }
 
 
@@ -135,9 +321,11 @@ async function ensureSession() {
   } = await supabase.auth.signInAnonymously();
 
   if (error || !data?.session) {
+
     throw new Error(
-      'Unable to start secure session. Please try again.'
+      'Unable to start a secure session. Please try again.'
     );
+
   }
 
   return data.session;
@@ -166,10 +354,14 @@ async function activateStudent() {
     return;
   }
 
-  loginButton.disabled = true;
+  setLoading(
+    loginButton,
+    true,
+    'Verifying...'
+  );
 
   showMessage(
-    'Verifying your details...'
+    'Securely verifying your accommodation access...'
   );
 
   try {
@@ -184,8 +376,8 @@ async function activateStudent() {
       {
         body: {
           student_id: studentId,
-          access_code: accessCode,
-        },
+          access_code: accessCode
+        }
       }
     );
 
@@ -195,6 +387,7 @@ async function activateStudent() {
         data?.error ||
         'Invalid index number or access code.'
       );
+
     }
 
     currentStudent =
@@ -206,10 +399,6 @@ async function activateStudent() {
 
     loginSection.hidden = true;
 
-    /*
-     * If this student already has an allocation,
-     * display it immediately.
-     */
     const alreadyAllocated =
       await loadExistingAllocation();
 
@@ -217,10 +406,6 @@ async function activateStudent() {
       return;
     }
 
-    /*
-     * Gender is already stored:
-     * skip the gender selection screen.
-     */
     const gender =
       normalizeGender(
         data.student.gender
@@ -249,22 +434,29 @@ async function activateStudent() {
 
   } finally {
 
-    loginButton.disabled = false;
+    setLoading(
+      loginButton,
+      false
+    );
 
   }
 }
 
 
 // --------------------------------------------------
-// GENDER
+// GENDER SELECTION
 // --------------------------------------------------
 
 function showGenderSelection() {
 
+  updateProgress(2);
+
   genderMessage.textContent = '';
 
   showSection(genderSection);
+
 }
+
 
 async function selectGender(gender) {
 
@@ -301,19 +493,14 @@ async function selectGender(gender) {
     );
 
     if (error) {
+
       throw new Error(
         error.message ||
         'Unable to save gender selection.'
       );
+
     }
 
-    /*
-     * The RPC returns text.
-     *
-     * We don't trust the browser state alone.
-     * The database has now permanently recorded
-     * the student's gender.
-     */
     currentStudent.gender =
       normalized;
 
@@ -321,11 +508,13 @@ async function selectGender(gender) {
       'success-message';
 
     genderMessage.textContent =
-      'Gender recorded successfully.';
+      'Selection saved securely.';
 
     setTimeout(() => {
+
       showBlockSelection();
-    }, 300);
+
+    }, 350);
 
   } catch (error) {
 
@@ -342,6 +531,7 @@ async function selectGender(gender) {
     );
 
   }
+
 }
 
 
@@ -351,10 +541,14 @@ async function selectGender(gender) {
 
 function showBlockSelection() {
 
+  updateProgress(3);
+
   blockMessage.textContent = '';
 
   showSection(blockSection);
+
 }
+
 
 function selectBlock(block) {
 
@@ -369,9 +563,11 @@ function selectBlock(block) {
     return;
   }
 
-  selectedBlock = block;
+  selectedBlock =
+    block;
 
   loadRooms(block);
+
 }
 
 
@@ -382,19 +578,39 @@ function selectBlock(block) {
 async function loadRooms(block = selectedBlock) {
 
   if (!block) {
+
     showBlockSelection();
+
     return;
+
   }
 
-  selectedBlock = block;
+  selectedBlock =
+    block;
+
+  updateProgress(4);
 
   showSection(roomsSection);
 
   roomSubtitle.textContent =
     `${block} Block`;
 
-  grid.innerHTML =
-    '<p>Loading available rooms...</p>';
+  grid.innerHTML = `
+
+    <div class="rooms-loading">
+
+      <div class="loading-orbit"></div>
+
+      <h3>Finding available rooms</h3>
+
+      <p>
+        Checking current availability in
+        ${escapeHtml(block)} Block.
+      </p>
+
+    </div>
+
+  `;
 
   try {
 
@@ -420,7 +636,11 @@ async function loadRooms(block = selectedBlock) {
     }
 
     if (data?.error) {
-      throw new Error(data.error);
+
+      throw new Error(
+        data.error
+      );
+
     }
 
     const rooms =
@@ -429,23 +649,29 @@ async function loadRooms(block = selectedBlock) {
     if (!rooms.length) {
 
       grid.innerHTML = `
-        <div class="empty-state">
 
-          <h3>No rooms currently available</h3>
+        <div class="empty-state modern-empty">
+
+          <div class="empty-icon">
+            <span>⌂</span>
+          </div>
+
+          <h3>No rooms available</h3>
 
           <p>
             There are currently no bookable rooms
-            available in ${escapeHtml(block)}.
+            available in ${escapeHtml(block)} Block.
           </p>
 
           <button
             id="returnToBlocks"
             class="secondary-button"
           >
-            Choose Another Block
+            Choose another block
           </button>
 
         </div>
+
       `;
 
       document
@@ -458,23 +684,32 @@ async function loadRooms(block = selectedBlock) {
       return;
     }
 
+
     grid.innerHTML =
       rooms.map(room => {
 
         const availableBeds =
-          Number(room.available_beds ?? 0);
+          Number(
+            room.available_beds ?? 0
+          );
 
         const occupiedBeds =
-          Number(room.occupied_beds ?? 0);
+          Number(
+            room.occupied_beds ?? 0
+          );
 
         const capacity =
-          Number(room.capacity ?? 4);
+          Number(
+            room.capacity ?? 4
+          );
 
         const roomGender =
-          normalizeGender(room.gender);
+          normalizeGender(
+            room.gender
+          );
 
         let genderLabel =
-          'Gender not yet established';
+          'Gender not established';
 
         let genderClass =
           'neutral';
@@ -501,75 +736,156 @@ async function loadRooms(block = selectedBlock) {
 
         }
 
-        /*
-         * Dome 31–40 are permanently male-only.
-         */
+
         const isDomeMaleOnly =
           room.block === 'Dome' &&
           /^(3[1-9]|40)$/.test(
             String(room.room_number)
           );
 
+
         if (isDomeMaleOnly) {
 
           genderLabel =
-            'Male-only room';
+            'Male only';
 
           genderClass =
             'male-only';
 
         }
 
+
+        const occupancyPercent =
+          Math.min(
+            100,
+            Math.round(
+              (occupiedBeds / capacity) * 100
+            )
+          );
+
+
+        const bedVisual =
+          Array.from(
+            { length: capacity },
+            (_, index) => {
+
+              const occupied =
+                index < occupiedBeds;
+
+              return `
+                <span
+                  class="bed-indicator ${occupied ? 'occupied' : 'available'}"
+                  title="${occupied ? 'Occupied' : 'Available'}"
+                >
+                  ${occupied ? '●' : '○'}
+                </span>
+              `;
+
+            }
+          ).join('');
+
+
         return `
-          <article class="room-card">
 
-            <div class="room-card-header">
+          <article
+            class="room-card modern-room-card"
+          >
 
-              <h3>
-                ${escapeHtml(room.room_code)}
-              </h3>
+            <div class="room-card-top">
 
-              <span class="gender-badge ${genderClass}">
+              <span class="room-block-label">
+                ${escapeHtml(room.block)}
+              </span>
+
+              <span
+                class="gender-badge ${genderClass}"
+              >
                 ${escapeHtml(genderLabel)}
               </span>
 
             </div>
 
-            <p class="room-location">
-              ${escapeHtml(room.block)}
-              · Floor ${escapeHtml(room.floor)}
-              · Room ${escapeHtml(room.room_number)}
-            </p>
 
-            <div class="occupancy">
+            <div class="room-card-header">
 
-              <strong>
-                ${availableBeds}
-              </strong>
+              <div>
 
-              <span>
-                bed${availableBeds === 1 ? '' : 's'}
-                available
+                <h3>
+                  ${escapeHtml(room.room_code)}
+                </h3>
+
+                <p class="room-location">
+                  Floor ${escapeHtml(room.floor)}
+                  · Room ${escapeHtml(room.room_number)}
+                </p>
+
+              </div>
+
+            </div>
+
+
+            <div class="room-visual">
+
+              <div class="bed-indicators">
+                ${bedVisual}
+              </div>
+
+              <span class="occupancy-percent">
+                ${occupancyPercent}%
               </span>
 
             </div>
 
-            <p class="occupancy-detail">
-              ${occupiedBeds} / ${capacity}
-              beds occupied
-            </p>
+
+            <div class="room-capacity">
+
+              <div>
+
+                <strong>
+                  ${availableBeds}
+                </strong>
+
+                <span>
+                  ${availableBeds === 1 ? 'bed' : 'beds'}
+                  available
+                </span>
+
+              </div>
+
+              <div class="capacity-text">
+                ${occupiedBeds}/${capacity}
+                occupied
+              </div>
+
+            </div>
+
+
+            <div class="occupancy-bar">
+
+              <span
+                style="width:${occupancyPercent}%"
+              ></span>
+
+            </div>
+
 
             <button
-              class="select-room"
+              class="select-room modern-select-room"
               data-room-id="${escapeHtml(room.id)}"
             >
-              Select Room
+
+              <span>Select this room</span>
+
+              <span aria-hidden="true">→</span>
+
             </button>
 
           </article>
+
         `;
 
       }).join('');
+
 
     document
       .querySelectorAll('.select-room')
@@ -584,10 +900,16 @@ async function loadRooms(block = selectedBlock) {
 
       });
 
+
   } catch (error) {
 
     grid.innerHTML = `
-      <div class="empty-state">
+
+      <div class="empty-state modern-empty">
+
+        <div class="empty-icon error-icon">
+          !
+        </div>
 
         <h3>Unable to load rooms</h3>
 
@@ -602,10 +924,11 @@ async function loadRooms(block = selectedBlock) {
           id="retryRooms"
           class="secondary-button"
         >
-          Try Again
+          Try again
         </button>
 
       </div>
+
     `;
 
     document
@@ -616,6 +939,7 @@ async function loadRooms(block = selectedBlock) {
       );
 
   }
+
 }
 
 
@@ -623,10 +947,14 @@ async function loadRooms(block = selectedBlock) {
 // CHANGE BLOCK
 // --------------------------------------------------
 
-changeBlockButton.addEventListener(
-  'click',
-  showBlockSelection
-);
+if (changeBlockButton) {
+
+  changeBlockButton.addEventListener(
+    'click',
+    showBlockSelection
+  );
+
+}
 
 
 // --------------------------------------------------
@@ -650,8 +978,8 @@ async function holdRoom(roomId) {
       {
         body: {
           action: 'hold',
-          room_id: roomId,
-        },
+          room_id: roomId
+        }
       }
     );
 
@@ -665,12 +993,19 @@ async function holdRoom(roomId) {
     }
 
     if (data?.error) {
-      throw new Error(data.error);
+
+      throw new Error(
+        data.error
+      );
+
     }
 
-    currentHold = data;
+    currentHold =
+      data;
 
-    showHoldConfirmation(data);
+    showHoldConfirmation(
+      data
+    );
 
   } catch (error) {
 
@@ -679,9 +1014,12 @@ async function holdRoom(roomId) {
       'Unable to hold this room.'
     );
 
-    await loadRooms(selectedBlock);
+    await loadRooms(
+      selectedBlock
+    );
 
   }
+
 }
 
 
@@ -691,64 +1029,120 @@ async function holdRoom(roomId) {
 
 function showHoldConfirmation(hold) {
 
-  showSection(allocationSection);
+  updateProgress(5);
+
+  showSection(
+    allocationSection
+  );
 
   allocationSection.innerHTML = `
 
-    <div class="hold-box">
+    <div class="reservation-shell">
 
-      <h2>Room Temporarily Held</h2>
+      <div class="reservation-status">
+        <span class="status-dot"></span>
+        Room temporarily reserved
+      </div>
 
-      <p>
-        You have temporarily reserved:
-      </p>
 
-      <div class="hold-details">
+      <div class="reservation-heading">
+
+        <span class="eyebrow">
+          YOUR RESERVATION
+        </span>
+
+        <h2>
+          Confirm your room
+        </h2>
 
         <p>
-          Room:
-          <strong>
-            ${escapeHtml(hold.room_code)}
-          </strong>
-        </p>
-
-        <p>
-          Bed:
-          <strong>
-            ${escapeHtml(hold.bed_number)}
-          </strong>
+          This room is being held exclusively
+          for you while you complete confirmation.
         </p>
 
       </div>
 
-      <p>
-        You must confirm this allocation before
-        your hold expires.
-      </p>
 
-      <div
-        id="countdown"
-        class="countdown"
-      >
-        Checking hold time...
+      <div class="reservation-room">
+
+        <div class="reservation-room-code">
+          ${escapeHtml(hold.room_code)}
+        </div>
+
+        <div class="reservation-bed">
+          Bed ${escapeHtml(hold.bed_number)}
+        </div>
+
       </div>
 
-      <button id="confirmAllocation">
-        Confirm Allocation
-      </button>
 
-      <button
-        id="cancelHoldView"
-        class="secondary-button"
-      >
-        Return to Rooms
-      </button>
+      <div class="reservation-warning">
 
-      <p id="holdMessage"></p>
+        <div class="warning-icon">
+          !
+        </div>
+
+        <div>
+
+          <strong>
+            Your reservation is temporary
+          </strong>
+
+          <p>
+            Confirm your allocation before the
+            reservation expires.
+          </p>
+
+        </div>
+
+      </div>
+
+
+      <div class="countdown-panel">
+
+        <span>
+          RESERVATION EXPIRES IN
+        </span>
+
+        <strong
+          id="countdown"
+          class="countdown"
+        >
+          Checking...
+        </strong>
+
+      </div>
+
+
+      <div class="reservation-actions">
+
+        <button
+          id="confirmAllocation"
+          class="primary-action"
+        >
+          Confirm room
+          <span aria-hidden="true">→</span>
+        </button>
+
+        <button
+          id="cancelHoldView"
+          class="secondary-button"
+        >
+          Return to rooms
+        </button>
+
+      </div>
+
+
+      <p
+        id="holdMessage"
+        class="hold-message"
+      ></p>
 
     </div>
 
   `;
+
 
   document
     .getElementById('confirmAllocation')
@@ -759,6 +1153,7 @@ function showHoldConfirmation(hold) {
       )
     );
 
+
   document
     .getElementById('cancelHoldView')
     .addEventListener(
@@ -767,14 +1162,21 @@ function showHoldConfirmation(hold) {
 
         stopHoldTimer();
 
-        allocationSection.hidden = true;
+        allocationSection.hidden =
+          true;
 
-        loadRooms(selectedBlock);
+        loadRooms(
+          selectedBlock
+        );
 
       }
     );
 
-  startHoldCountdown(hold);
+
+  startHoldCountdown(
+    hold
+  );
+
 }
 
 
@@ -791,9 +1193,10 @@ function startHoldCountdown(hold) {
       'countdown'
     );
 
-  /*
-   * The database uses expires_at.
-   */
+  if (!countdown) {
+    return;
+  }
+
   const expiresAt =
     hold.expires_at ||
     hold.expiresAt;
@@ -801,13 +1204,17 @@ function startHoldCountdown(hold) {
   if (!expiresAt) {
 
     countdown.textContent =
-      'Hold active — please confirm now.';
+      'Please confirm now';
 
     return;
+
   }
 
   const expiry =
-    new Date(expiresAt).getTime();
+    new Date(
+      expiresAt
+    ).getTime();
+
 
   function updateCountdown() {
 
@@ -817,36 +1224,50 @@ function startHoldCountdown(hold) {
         expiry - Date.now()
       );
 
+
     if (remaining <= 0) {
 
       countdown.textContent =
-        'Your hold has expired.';
+        '00:00';
 
       countdown.classList.add(
         'expired'
       );
+
 
       const confirmButton =
         document.getElementById(
           'confirmAllocation'
         );
 
+
       if (confirmButton) {
-        confirmButton.disabled = true;
+
+        confirmButton.disabled =
+          true;
+
       }
+
 
       stopHoldTimer();
 
+
       setTimeout(() => {
 
-        allocationSection.hidden = true;
+        allocationSection.hidden =
+          true;
 
-        loadRooms(selectedBlock);
+        loadRooms(
+          selectedBlock
+        );
 
       }, 1500);
 
+
       return;
+
     }
+
 
     const totalSeconds =
       Math.ceil(
@@ -861,21 +1282,39 @@ function startHoldCountdown(hold) {
     const seconds =
       totalSeconds % 60;
 
+
     countdown.textContent =
-      `Hold expires in ${minutes}:${String(
-        seconds
-      ).padStart(2, '0')}`;
+      `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+
+
+    if (remaining <= 30000) {
+
+      countdown.classList.add(
+        'urgent'
+      );
+
+    } else {
+
+      countdown.classList.remove(
+        'urgent'
+      );
+
+    }
 
   }
 
+
   updateCountdown();
+
 
   holdTimer =
     setInterval(
       updateCountdown,
       1000
     );
+
 }
+
 
 function stopHoldTimer() {
 
@@ -885,9 +1324,11 @@ function stopHoldTimer() {
       holdTimer
     );
 
-    holdTimer = null;
+    holdTimer =
+      null;
 
   }
+
 }
 
 
@@ -895,7 +1336,9 @@ function stopHoldTimer() {
 // CONFIRM ALLOCATION
 // --------------------------------------------------
 
-async function confirmAllocation(holdId) {
+async function confirmAllocation(
+  holdId
+) {
 
   const button =
     document.getElementById(
@@ -907,14 +1350,30 @@ async function confirmAllocation(holdId) {
       'holdMessage'
     );
 
-  if (!button || !message) {
+
+  if (
+    !button ||
+    !message
+  ) {
     return;
   }
 
-  button.disabled = true;
+
+  button.disabled =
+    true;
+
+  button.innerHTML = `
+    <span class="button-spinner"></span>
+    Confirming...
+  `;
+
+
+  message.className =
+    'hold-message';
 
   message.textContent =
-    'Confirming allocation...';
+    'Finalising your accommodation allocation...';
+
 
   try {
 
@@ -926,10 +1385,11 @@ async function confirmAllocation(holdId) {
       {
         body: {
           action: 'confirm',
-          hold_id: holdId,
-        },
+          hold_id: holdId
+        }
       }
     );
+
 
     if (error) {
 
@@ -940,26 +1400,43 @@ async function confirmAllocation(holdId) {
 
     }
 
+
     if (data?.error) {
-      throw new Error(data.error);
+
+      throw new Error(
+        data.error
+      );
+
     }
+
 
     stopHoldTimer();
 
-    showAllocationReceipt(data);
+
+    showAllocationReceipt(
+      data
+    );
+
 
   } catch (error) {
 
     message.className =
-      'error';
+      'hold-message error';
 
     message.textContent =
       error.message ||
       'Unable to confirm allocation.';
 
-    button.disabled = false;
+    button.disabled =
+      false;
+
+    button.innerHTML = `
+      Confirm room
+      <span aria-hidden="true">→</span>
+    `;
 
   }
+
 }
 
 
@@ -967,87 +1444,180 @@ async function confirmAllocation(holdId) {
 // ALLOCATION RECEIPT
 // --------------------------------------------------
 
-function showAllocationReceipt(data) {
+function showAllocationReceipt(
+  data
+) {
 
-  showSection(allocationSection);
+  showSection(
+    allocationSection
+  );
 
   allocationSection.innerHTML = `
 
-    <div class="success-box">
+    <div class="allocation-success">
 
-      <div class="success-icon">
+      <div class="success-mark">
         ✓
       </div>
 
-      <h2>Allocation Confirmed</h2>
 
-      <p>
-        Your accommodation allocation has been
-        successfully confirmed.
+      <span class="eyebrow">
+        UHAS ASOGLI HALL
+      </span>
+
+
+      <h2>
+        Allocation confirmed
+      </h2>
+
+
+      <p class="success-lead">
+        Your accommodation has been successfully
+        allocated. Please keep this information
+        for your records.
       </p>
 
-      <div class="receipt">
 
-        <p>
-          Allocation Number:
+      <div class="allocation-ticket">
+
+        <div class="ticket-header">
+
+          <div>
+
+            <span>
+              ALLOCATION NUMBER
+            </span>
+
+            <strong>
+              ${escapeHtml(
+                data.allocation_number
+              )}
+            </strong>
+
+          </div>
+
+          <span class="ticket-confirmed">
+            CONFIRMED
+          </span>
+
+        </div>
+
+
+        <div class="ticket-student">
+
+          <span>STUDENT</span>
+
           <strong>
             ${escapeHtml(
-              data.allocation_number
+              data.student_name
             )}
           </strong>
-        </p>
+
+        </div>
+
+
+        <div class="ticket-grid">
+
+          <div>
+
+            <span>BLOCK</span>
+
+            <strong>
+              ${escapeHtml(
+                data.block
+              )}
+            </strong>
+
+          </div>
+
+
+          <div>
+
+            <span>ROOM</span>
+
+            <strong>
+              ${escapeHtml(
+                data.room_number
+              )}
+            </strong>
+
+          </div>
+
+
+          <div>
+
+            <span>BED</span>
+
+            <strong>
+              ${escapeHtml(
+                data.bed_number
+              )}
+            </strong>
+
+          </div>
+
+
+          <div>
+
+            <span>ROOM CODE</span>
+
+            <strong>
+              ${escapeHtml(
+                data.room_code
+              )}
+            </strong>
+
+          </div>
+
+        </div>
+
+      </div>
+
+
+      <div class="success-note">
+
+        <span>✓</span>
 
         <p>
-          Student:
-          ${escapeHtml(
-            data.student_name
-          )}
-        </p>
-
-        <p>
-          Room:
-          <strong>
-            ${escapeHtml(
-              data.room_code
-            )}
-          </strong>
-        </p>
-
-        <p>
-          Block:
-          ${escapeHtml(
-            data.block
-          )}
-        </p>
-
-        <p>
-          Room Number:
-          ${escapeHtml(
-            data.room_number
-          )}
-        </p>
-
-        <p>
-          Bed:
-          <strong>
-            ${escapeHtml(
-              data.bed_number
-            )}
-          </strong>
+          Your allocation is now recorded in the
+          UHAS Asogli Hall accommodation system.
         </p>
 
       </div>
 
-      <p class="important-note">
-        Please save your allocation number for
-        future reference.
-      </p>
+
+      <button
+        class="primary-action"
+        id="printAllocation"
+      >
+        Print / Save allocation
+        <span aria-hidden="true">↗</span>
+      </button>
 
     </div>
 
   `;
 
-  roomsSection.hidden = true;
+
+  roomsSection.hidden =
+    true;
+
+
+  const printButton =
+    document.getElementById(
+      'printAllocation'
+    );
+
+
+  if (printButton) {
+
+    printButton.addEventListener(
+      'click',
+      () => window.print()
+    );
+
+  }
+
 }
 
 
@@ -1066,18 +1636,32 @@ async function loadExistingAllocation() {
       'my-allocation'
     );
 
+
     if (
       error ||
       !data?.allocation
     ) {
+
       return false;
+
     }
 
-    loginSection.hidden = true;
-    genderSection.hidden = true;
-    blockSection.hidden = true;
-    roomsSection.hidden = true;
-    allocationSection.hidden = false;
+
+    loginSection.hidden =
+      true;
+
+    genderSection.hidden =
+      true;
+
+    blockSection.hidden =
+      true;
+
+    roomsSection.hidden =
+      true;
+
+    allocationSection.hidden =
+      false;
+
 
     const allocation =
       data.allocation;
@@ -1088,62 +1672,136 @@ async function loadExistingAllocation() {
     const room =
       bed?.rooms;
 
+
     allocationSection.innerHTML = `
 
-      <div class="success-box">
+      <div class="allocation-success">
 
-        <div class="success-icon">
+        <div class="success-mark">
           ✓
         </div>
 
-        <h2>Your Allocation</h2>
 
-        <p>
-          You already have a confirmed
-          accommodation allocation.
+        <span class="eyebrow">
+          UHAS ASOGLI HALL
+        </span>
+
+
+        <h2>
+          Your allocation
+        </h2>
+
+
+        <p class="success-lead">
+          You already have a confirmed accommodation
+          allocation.
         </p>
 
-        <div class="receipt">
 
-          <p>
-            Allocation Number:
+        <div class="allocation-ticket">
+
+          <div class="ticket-header">
+
+            <div>
+
+              <span>
+                ALLOCATION NUMBER
+              </span>
+
+              <strong>
+                ${escapeHtml(
+                  allocation.allocation_number
+                )}
+              </strong>
+
+            </div>
+
+            <span class="ticket-confirmed">
+              CONFIRMED
+            </span>
+
+          </div>
+
+
+          <div class="ticket-student">
+
+            <span>STUDENT</span>
+
             <strong>
               ${escapeHtml(
-                allocation.allocation_number
+                currentStudent?.student_name ||
+                ''
               )}
             </strong>
-          </p>
+
+          </div>
+
+
+          <div class="ticket-grid">
+
+            <div>
+
+              <span>BLOCK</span>
+
+              <strong>
+                ${escapeHtml(
+                  room?.block
+                )}
+              </strong>
+
+            </div>
+
+
+            <div>
+
+              <span>ROOM</span>
+
+              <strong>
+                ${escapeHtml(
+                  room?.room_number
+                )}
+              </strong>
+
+            </div>
+
+
+            <div>
+
+              <span>BED</span>
+
+              <strong>
+                ${escapeHtml(
+                  bed?.bed_number
+                )}
+              </strong>
+
+            </div>
+
+
+            <div>
+
+              <span>ROOM CODE</span>
+
+              <strong>
+                ${escapeHtml(
+                  room?.room_code
+                )}
+              </strong>
+
+            </div>
+
+          </div>
+
+        </div>
+
+
+        <div class="success-note">
+
+          <span>✓</span>
 
           <p>
-            Room:
-            <strong>
-              ${escapeHtml(
-                room?.room_code
-              )}
-            </strong>
-          </p>
-
-          <p>
-            Block:
-            ${escapeHtml(
-              room?.block
-            )}
-          </p>
-
-          <p>
-            Room Number:
-            ${escapeHtml(
-              room?.room_number
-            )}
-          </p>
-
-          <p>
-            Bed:
-            <strong>
-              ${escapeHtml(
-                bed?.bed_number
-              )}
-            </strong>
+            This allocation is already confirmed
+            and cannot be booked again.
           </p>
 
         </div>
@@ -1152,13 +1810,16 @@ async function loadExistingAllocation() {
 
     `;
 
+
     return true;
+
 
   } catch {
 
     return false;
 
   }
+
 }
 
 
@@ -1166,32 +1827,55 @@ async function loadExistingAllocation() {
 // EVENT LISTENERS
 // --------------------------------------------------
 
-loginButton.addEventListener(
-  'click',
-  activateStudent
-);
+if (loginButton) {
 
-accessCodeInput.addEventListener(
-  'keydown',
-  event => {
+  loginButton.addEventListener(
+    'click',
+    activateStudent
+  );
 
-    if (event.key === 'Enter') {
-      activateStudent();
+}
+
+
+if (accessCodeInput) {
+
+  accessCodeInput.addEventListener(
+    'keydown',
+    event => {
+
+      if (
+        event.key === 'Enter'
+      ) {
+
+        activateStudent();
+
+      }
+
     }
+  );
 
-  }
-);
+}
 
-indexInput.addEventListener(
-  'keydown',
-  event => {
 
-    if (event.key === 'Enter') {
-      activateStudent();
+if (indexInput) {
+
+  indexInput.addEventListener(
+    'keydown',
+    event => {
+
+      if (
+        event.key === 'Enter'
+      ) {
+
+        activateStudent();
+
+      }
+
     }
+  );
 
-  }
-);
+}
+
 
 document
   .querySelectorAll('.gender-choice')
@@ -1205,6 +1889,7 @@ document
     );
 
   });
+
 
 document
   .querySelectorAll('.block-choice')
@@ -1228,27 +1913,30 @@ document
 
   try {
 
+    applyBranding();
+
+    createApplicationHeader();
+
+    updateProgress(1);
+
+
     const {
       data: {
         session
       }
     } = await supabase.auth.getSession();
 
+
     if (session) {
 
       const existingAllocation =
         await loadExistingAllocation();
 
+
       if (!existingAllocation) {
 
-        /*
-         * We deliberately do not attempt to infer
-         * the student's identity from the anonymous
-         * session. The student must authenticate
-         * through the login flow.
-         */
-
-        loginSection.hidden = false;
+        loginSection.hidden =
+          false;
 
       }
 
@@ -1256,7 +1944,12 @@ document
 
   } catch {
 
-    // Remain on login screen.
+    if (loginSection) {
+
+      loginSection.hidden =
+        false;
+
+    }
 
   }
 
