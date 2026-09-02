@@ -2,181 +2,315 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
 
-  <title>UHAS MSA Room Allocation</title>
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1"
+  >
+
+  <meta
+    name="theme-color"
+    content="#075b3a"
+  >
+
+  <meta
+    name="description"
+    content="UHAS Asogli Hall student accommodation room allocation portal."
+  >
+
+  <title>UHAS Asogli Hall Room Allocation</title>
 
   <link rel="stylesheet" href="styles.css">
 </head>
 
 <body>
 
-<main>
+  <!--
+    The application header and progress indicator
+    are created dynamically by app.js.
+  -->
 
-  <header>
-    <h1>UHAS MSA Room Allocation</h1>
-    <p>Self-Service Accommodation Portal</p>
-  </header>
+  <main>
 
-  <!-- LOGIN -->
-  <section id="login">
-    <h2>Student Login</h2>
+    <!-- =====================================================
+         STUDENT LOGIN
+         ===================================================== -->
 
-    <p>
-      Enter your index number and unique access code.
-    </p>
+    <section id="login">
 
-    <label for="index">
-      Index Number
-    </label>
+      <header>
+        <h1>Room allocation, simplified.</h1>
 
-    <input
-      id="index"
-      type="text"
-      autocomplete="username"
-      placeholder="e.g. UHAS202400001"
-    >
+        <p>
+          Securely access your UHAS Asogli Hall accommodation
+          allocation portal.
+        </p>
+      </header>
 
-    <label for="accessCode">
-      Unique Access Code
-    </label>
+      <div class="info-strip">
 
-    <input
-      id="accessCode"
-      type="password"
-      autocomplete="current-password"
-      placeholder="Enter your access code"
-    >
+        <div class="info-item">
+          <small>Portal</small>
+          <strong>Asogli Hall</strong>
+        </div>
 
-    <button id="loginButton">
-      Continue
-    </button>
+        <div class="info-item">
+          <small>Access</small>
+          <strong>Student Self-Service</strong>
+        </div>
 
-    <p id="msg" role="alert"></p>
-  </section>
-
-
-  <!-- GENDER -->
-  <section id="genderSelection" hidden>
-
-    <h2>Select Gender</h2>
-
-    <p>
-      Please select your gender before continuing to room selection.
-    </p>
-
-    <div class="choices">
-
-      <button
-        class="choice-button gender-choice"
-        data-gender="MALE"
-      >
-        <strong>Male</strong>
-        <span>Male accommodation allocation</span>
-      </button>
-
-      <button
-        class="choice-button gender-choice"
-        data-gender="FEMALE"
-      >
-        <strong>Female</strong>
-        <span>Female accommodation allocation</span>
-      </button>
-
-    </div>
-
-    <p id="genderMessage" role="alert"></p>
-
-  </section>
-
-
-  <!-- BLOCK -->
-  <section id="blockSelection" hidden>
-
-    <h2>Select Hostel Block</h2>
-
-    <p>
-      Choose the block where you want to look for an available room.
-    </p>
-
-    <div class="choices">
-
-      <button
-        class="choice-button block-choice"
-        data-block="Ahoe"
-      >
-        <strong>Ahoe</strong>
-        <span>View available Ahoe rooms</span>
-      </button>
-
-      <button
-        class="choice-button block-choice"
-        data-block="Bankoe"
-      >
-        <strong>Bankoe</strong>
-        <span>View available Bankoe rooms</span>
-      </button>
-
-      <button
-        class="choice-button block-choice"
-        data-block="Dome"
-      >
-        <strong>Dome</strong>
-        <span>View available Dome rooms</span>
-      </button>
-
-      <button
-        class="choice-button block-choice"
-        data-block="Hliha"
-      >
-        <strong>Hliha</strong>
-        <span>View available Hliha rooms</span>
-      </button>
-
-    </div>
-
-    <p id="blockMessage" role="alert"></p>
-
-  </section>
-
-
-  <!-- ROOMS -->
-  <section id="rooms" hidden>
-
-    <div class="section-heading">
-
-      <div>
-        <h2>Available Rooms</h2>
-        <p id="roomSubtitle"></p>
       </div>
 
-      <button
-        id="changeBlockButton"
-        class="secondary-button"
+      <label for="index">
+        Index Number
+      </label>
+
+      <input
+        id="index"
+        type="text"
+        inputmode="text"
+        autocomplete="username"
+        autocapitalize="characters"
+        spellcheck="false"
+        placeholder="e.g. UHAS202400001"
+        aria-describedby="msg"
       >
-        Change Block
+
+      <label for="accessCode">
+        Unique Access Code
+      </label>
+
+      <input
+        id="accessCode"
+        type="password"
+        autocomplete="current-password"
+        placeholder="Enter your access code"
+        aria-describedby="msg"
+      >
+
+      <button
+        id="loginButton"
+        type="button"
+      >
+        Continue
       </button>
 
-    </div>
+      <p
+        id="msg"
+        role="alert"
+        aria-live="polite"
+      ></p>
 
-    <div id="grid" class="grid"></div>
-
-  </section>
-
-
-  <!-- ALLOCATION / HOLD -->
-  <section
-    id="allocation"
-    hidden
-  ></section>
-
-</main>
+    </section>
 
 
-<script
-  type="module"
-  src="app.js"
-></script>
+    <!-- =====================================================
+         GENDER SELECTION
+         ===================================================== -->
+
+    <section
+      id="genderSelection"
+      hidden
+    >
+
+      <div class="section-heading">
+
+        <div>
+          <h2>Complete your profile</h2>
+
+          <p>
+            Select your gender to continue to room selection.
+          </p>
+        </div>
+
+      </div>
+
+      <div class="choices">
+
+        <button
+          type="button"
+          class="choice-button gender-choice"
+          data-gender="MALE"
+        >
+          <strong>Male</strong>
+
+          <span>
+            Select male accommodation
+          </span>
+        </button>
+
+        <button
+          type="button"
+          class="choice-button gender-choice"
+          data-gender="FEMALE"
+        >
+          <strong>Female</strong>
+
+          <span>
+            Select female accommodation
+          </span>
+        </button>
+
+      </div>
+
+      <p
+        id="genderMessage"
+        role="alert"
+        aria-live="polite"
+      ></p>
+
+    </section>
+
+
+    <!-- =====================================================
+         BLOCK SELECTION
+         ===================================================== -->
+
+    <section
+      id="blockSelection"
+      hidden
+    >
+
+      <div class="section-heading">
+
+        <div>
+          <h2>Choose your block</h2>
+
+          <p>
+            Select a hostel block to view its available rooms.
+          </p>
+        </div>
+
+      </div>
+
+      <div class="choices">
+
+        <button
+          type="button"
+          class="choice-button block-choice"
+          data-block="Ahoe"
+        >
+          <strong>Ahoe</strong>
+
+          <span>
+            View available Ahoe rooms
+          </span>
+        </button>
+
+        <button
+          type="button"
+          class="choice-button block-choice"
+          data-block="Bankoe"
+        >
+          <strong>Bankoe</strong>
+
+          <span>
+            View available Bankoe rooms
+          </span>
+        </button>
+
+        <button
+          type="button"
+          class="choice-button block-choice"
+          data-block="Dome"
+        >
+          <strong>Dome</strong>
+
+          <span>
+            View available Dome rooms
+          </span>
+        </button>
+
+        <button
+          type="button"
+          class="choice-button block-choice"
+          data-block="Hliha"
+        >
+          <strong>Hliha</strong>
+
+          <span>
+            View available Hliha rooms
+          </span>
+        </button>
+
+      </div>
+
+      <p
+        id="blockMessage"
+        role="alert"
+        aria-live="polite"
+      ></p>
+
+    </section>
+
+
+    <!-- =====================================================
+         ROOM SELECTION
+         ===================================================== -->
+
+    <section
+      id="rooms"
+      hidden
+    >
+
+      <div class="section-heading">
+
+        <div>
+          <h2>Choose your room</h2>
+
+          <p id="roomSubtitle">
+            Available rooms will appear here.
+          </p>
+        </div>
+
+        <button
+          id="changeBlockButton"
+          type="button"
+          class="secondary-button"
+        >
+          Change Block
+        </button>
+
+      </div>
+
+      <div
+        id="grid"
+        class="grid"
+        aria-live="polite"
+      ></div>
+
+    </section>
+
+
+    <!-- =====================================================
+         RESERVATION / ALLOCATION
+         ===================================================== -->
+
+    <section
+      id="allocation"
+      hidden
+    ></section>
+
+  </main>
+
+
+  <!-- =======================================================
+       FOOTER
+       ======================================================= -->
+
+  <footer>
+    UHAS Asogli Hall Room Allocation Portal
+  </footer>
+
+
+  <!-- =======================================================
+       APPLICATION
+       ======================================================= -->
+
+  <script
+    type="module"
+    src="app.js"
+  ></script>
 
 </body>
 </html>
