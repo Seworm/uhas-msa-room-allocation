@@ -1,911 +1,306 @@
-import {
-    SUPABASE_URL,
-    SUPABASE_PUBLISHABLE_KEY
-} from "../config.js";
-
-import {
-    createClient
-} from "https://esm.sh/@supabase/supabase-js@2";
-
-const supabase = createClient(
-    SUPABASE_URL,
-    SUPABASE_PUBLISHABLE_KEY
-);
-
-
-const $ = (selector) =>
-    document.querySelector(selector);
-
-
-const loginView = $("#loginView");
-const appView = $("#appView");
-
-let currentAllocations = [];
-let currentUnallocated = [];
-let currentRooms = [];
-let currentAudit = [];
-
-
-function showToast(message, type = "") {
-
-    const toast = $("#toast");
-
-    toast.textContent = message;
-    toast.className = `toast show ${type}`;
-
-    setTimeout(() => {
-        toast.className = "toast";
-    }, 3000);
-}
-
-
-function escapeHtml(value) {
-
-    if (value === null || value === undefined) {
-        return "";
-    }
-
-    return String(value)
-        .replaceAll("&", "&amp;")
-        .replaceAll("<", "&lt;")
-        .replaceAll(">", "&gt;")
-        .replaceAll('"', "&quot;")
-        .replaceAll("'", "&#039;");
-}
-
-
-function formatDate(value) {
-
-    if (!value) return "—";
-
-    return new Intl.DateTimeFormat(
-        undefined,
-        {
-            dateStyle: "medium",
-            timeStyle: "short"
-        }
-    ).format(new Date(value));
-}
-
-
-async function getAdminRole() {
-
-    const {
-        data: { user },
-        error
-    } = await supabase.auth.getUser();
-
-    if (error || !user) {
-        throw new Error("Authentication session not found.");
-    }
-
-    const {
-        data,
-        error: profileError
-    } = await supabase
-        .from("profiles")
-        .select("role")
-        .eq("id", user.id)
-        .single();
-
-    if (profileError || !data) {
-        throw new Error("Administrator profile not found.");
-    }
-
-    if (!["admin", "super_admin"].includes(data.role)) {
-        await supabase.auth.signOut();
-        throw new Error("This account is not authorised for administration.");
-    }
-
-    return data.role;
-}
-
-
-async function rpc(name, args = {}) {
-
-    const {
-        data,
-        error
-    } = await supabase.rpc(name, args);
-
-    if (error) {
-        console.error(name, error);
-        throw new Error(error.message || `Unable to load ${name}.`);
-    }
-
-    return data;
-}
-
-
-async function loadDashboard() {
-
-    const summary = await rpc(
-        "admin_dashboard_summary"
-    );
-
-    /*
-     * The RPC may return either one object or one row.
-     */
-    const row = Array.isArray(summary)
-        ? summary[0]
-        : summary;
-
-    if (!row) {
-        throw new Error("Dashboard summary returned no data.");
-    }
-
-    $("#totalRooms").textContent =
-        row.total_rooms ?? row.rooms ?? "0";
-
-    $("#totalBeds").textContent =
-        row.total_beds ?? row.beds ?? "0";
-
-    $("#occupiedBeds").textContent =
-        row.occupied_beds ?? row.occupied ?? "0";
-
-    $("#availableBeds").textContent =
-        row.available_beds ?? row.available ?? "0";
-
-    $("#activeHolds").textContent =
-        row.active_holds ?? row.holds ?? "0";
-
-    $("#activeAllocations").textContent =
-        row.active_allocations ?? row.allocations ?? "0";
-
-    $("#unallocatedStudents").textContent =
-        row.unallocated_eligible_students ??
-        row.unallocated_students ??
-        "0";
-
-    const open =
-        row.allocation_open ??
-        row.is_allocation_open;
-
-    $("#allocationStatus").textContent =
-        open === true ? "OPEN" : "CLOSED";
-
-    $("#lastUpdated").textContent =
-        `Updated ${new Date().toLocaleTimeString()}`;
-}
-
-
-async function loadRooms() {
-
-    const block = $("#blockFilter").value;
-
-    currentRooms = await rpc(
-        "admin_rooms",
-        {
-            p_block: block || null
-        }
-    );
-
-    renderRooms();
-}
-
-
-function renderRooms() {
-
-    const container = $("#roomsGrid");
-
-    if (!currentRooms.length) {
-        container.innerHTML = `
-            <div class="empty-state">
-                No rooms found.
-            </div>
-        `;
-        return;
-    }
-
-    container.innerHTML = currentRooms.map(room => {
-
-        const capacity =
-            Number(room.capacity ?? 0);
-
-        const occupied =
-            Number(
-                room.occupied_beds ??
-                room.occupied ??
-                0
-            );
-
-        const available =
-            Number(
-                room.available_beds ??
-                Math.max(capacity - occupied, 0)
-            );
-
-        const percent =
-            capacity
-                ? Math.round((occupied / capacity) * 100)
-                : 0;
-
-        const gender =
-            room.gender ||
-            "Neutral";
-
-        const locked =
-            room.temporarily_locked === true ||
-            room.bookable === false;
-
-        return `
-            <button
-                class="room-card"
-                data-room-id="${escapeHtml(room.id)}"
-            >
-
-                <div class="room-card-top">
-
-                    <span class="room-code">
-                        ${escapeHtml(room.room_code)}
-                    </span>
-
-                    <span class="room-gender">
-                        ${escapeHtml(gender)}
-                    </span>
-
-                </div>
-
-                <div class="room-number">
-                    Room ${escapeHtml(room.room_number)}
-                </div>
-
-                <div class="room-meta">
-                    ${escapeHtml(room.block)}
-                    · ${escapeHtml(room.floor ?? "")}
-                </div>
-
-                <div class="progress">
-                    <span style="width:${percent}%"></span>
-                </div>
-
-                <div class="room-footer">
-
-                    <span>
-                        ${occupied}/${capacity} occupied
-                    </span>
-
-                    <span>
-                        ${available} available
-                    </span>
-
-                </div>
-
-                ${
-                    locked
-                        ? `<div class="room-status locked">
-                            Locked
-                           </div>`
-                        : ""
-                }
-
-            </button>
-        `;
-
-    }).join("");
-
-    document
-        .querySelectorAll(".room-card")
-        .forEach(card => {
-
-            card.addEventListener(
-                "click",
-                () => openRoom(card.dataset.roomId)
-            );
-
-        });
-}
-
-
-async function openRoom(roomId) {
-
-    try {
-
-        const room =
-            currentRooms.find(
-                item => String(item.id) === String(roomId)
-            );
-
-        const occupants =
-            await rpc(
-                "admin_room_occupants",
-                {
-                    p_room_id: roomId
-                }
-            );
-
-        $("#modalRoomTitle").textContent =
-            room?.room_code || "Room";
-
-        $("#modalRoomSubtitle").textContent =
-            room
-                ? `${room.block} · Room ${room.room_number}`
-                : "";
-
-        renderOccupants(occupants);
-
-        $("#roomModal").classList.remove("hidden");
-
-    } catch (error) {
-
-        showToast(
-            error.message,
-            "error"
-        );
-
-    }
-}
-
-
-function renderOccupants(occupants) {
-
-    const container = $("#roomOccupants");
-
-    if (!occupants?.length) {
-
-        container.innerHTML = `
-            <div class="empty-state">
-                No occupants in this room.
-            </div>
-        `;
-
-        return;
-    }
-
-    container.innerHTML = occupants.map(student => `
-        <div class="occupant-card">
-
-            <div class="occupant-bed">
-                Bed ${escapeHtml(student.bed_number)}
-            </div>
-
-            <div>
-                <strong>
-                    ${escapeHtml(student.student_name)}
-                </strong>
-
-                <div class="muted">
-                    ${escapeHtml(student.student_id)}
-                </div>
-
-                <div class="muted">
-                    ${escapeHtml(student.level ?? "")}
-                    ·
-                    ${escapeHtml(student.programme ?? "")}
-                </div>
-            </div>
-
-            <div class="occupant-gender">
-                ${escapeHtml(student.gender ?? "—")}
-            </div>
-
-        </div>
-    `).join("");
-}
-
-
-async function loadAllocations() {
-
-    currentAllocations =
-        await rpc(
-            "admin_student_allocations",
-            {
-                p_search:
-                    $("#studentSearch").value.trim() || null,
-
-                p_block:
-                    $("#allocationBlockFilter").value || null,
-
-                p_gender:
-                    $("#genderFilter").value || null
-            }
-        );
-
-    renderAllocations();
-}
-
-
-function renderAllocations() {
-
-    const tbody =
-        $("#allocationsTable");
-
-    if (!currentAllocations?.length) {
-
-        tbody.innerHTML = `
-            <tr>
-                <td colspan="8">
-                    <div class="empty-state">
-                        No allocations found.
-                    </div>
-                </td>
-            </tr>
-        `;
-
-        return;
-    }
-
-    tbody.innerHTML =
-        currentAllocations.map(row => `
-
-            <tr>
-
-                <td>
-                    ${escapeHtml(row.student_id)}
-                </td>
-
-                <td>
-                    <strong>
-                        ${escapeHtml(row.student_name)}
-                    </strong>
-                </td>
-
-                <td>
-                    ${escapeHtml(row.level ?? "—")}
-                </td>
-
-                <td>
-                    ${escapeHtml(row.gender ?? "—")}
-                </td>
-
-                <td>
-                    ${escapeHtml(row.block ?? "—")}
-                </td>
-
-                <td>
-                    ${escapeHtml(
-                        row.room_code ??
-                        row.room_number ??
-                        "—"
-                    )}
-                </td>
-
-                <td>
-                    ${escapeHtml(row.bed_number ?? "—")}
-                </td>
-
-                <td>
-                    ${escapeHtml(
-                        row.allocation_number ?? "—"
-                    )}
-                </td>
-
-            </tr>
-
-        `).join("");
-}
-
-
-async function loadUnallocated() {
-
-    currentUnallocated =
-        await rpc(
-            "admin_unallocated_students",
-            {
-                p_search:
-                    $("#unallocatedSearch")
-                        .value
-                        .trim() || null
-            }
-        );
-
-    renderUnallocated();
-}
-
-
-function renderUnallocated() {
-
-    const tbody =
-        $("#unallocatedTable");
-
-    if (!currentUnallocated?.length) {
-
-        tbody.innerHTML = `
-            <tr>
-                <td colspan="6">
-                    <div class="empty-state">
-                        No unallocated eligible students found.
-                    </div>
-                </td>
-            </tr>
-        `;
-
-        return;
-    }
-
-    tbody.innerHTML =
-        currentUnallocated.map(row => `
-
-            <tr>
-
-                <td>
-                    ${escapeHtml(row.student_id)}
-                </td>
-
-                <td>
-                    <strong>
-                        ${escapeHtml(row.student_name)}
-                    </strong>
-                </td>
-
-                <td>
-                    ${escapeHtml(row.level ?? "—")}
-                </td>
-
-                <td>
-                    ${escapeHtml(row.programme ?? "—")}
-                </td>
-
-                <td>
-                    ${escapeHtml(row.gender ?? "—")}
-                </td>
-
-                <td>
-                    ${escapeHtml(row.email ?? "—")}
-                </td>
-
-            </tr>
-
-        `).join("");
-}
-
-
-async function loadAudit() {
-
-    currentAudit =
-        await rpc(
-            "admin_audit_logs",
-            {
-                p_limit: 100
-            }
-        );
-
-    renderAudit();
-}
-
-
-function renderAudit() {
-
-    const tbody =
-        $("#auditTable");
-
-    if (!currentAudit?.length) {
-
-        tbody.innerHTML = `
-            <tr>
-                <td colspan="5">
-                    <div class="empty-state">
-                        No audit activity found.
-                    </div>
-                </td>
-            </tr>
-        `;
-
-        return;
-    }
-
-    tbody.innerHTML =
-        currentAudit.map(row => `
-
-            <tr>
-
-                <td>
-                    ${escapeHtml(
-                        formatDate(row.created_at)
-                    )}
-                </td>
-
-                <td>
-                    <span class="action-badge">
-                        ${escapeHtml(row.action)}
-                    </span>
-                </td>
-
-                <td>
-                    ${escapeHtml(row.entity)}
-                </td>
-
-                <td>
-                    ${escapeHtml(
-                        row.entity_id ?? "—"
-                    )}
-                </td>
-
-                <td>
-                    <code>
-                        ${escapeHtml(
-                            JSON.stringify(
-                                row.details ?? {}
-                            )
-                        )}
-                    </code>
-                </td>
-
-            </tr>
-
-        `).join("");
-}
-
-
-async function loadEverything() {
-
-    try {
-
-        await Promise.all([
-            loadDashboard(),
-            loadRooms(),
-            loadAllocations(),
-            loadUnallocated(),
-            loadAudit()
-        ]);
-
-    } catch (error) {
-
-        console.error(error);
-
-        showToast(
-            error.message,
-            "error"
-        );
-    }
-}
-
-
-function csvEscape(value) {
-
-    const text =
-        value === null ||
-        value === undefined
-            ? ""
-            : String(value);
-
-    return `"${text.replaceAll('"', '""')}"`;
-}
-
-
-function downloadCsv(filename, rows) {
-
-    if (!rows?.length) {
-
-        showToast(
-            "There is no data to export.",
-            "error"
-        );
-
-        return;
-    }
-
-    const headers =
-        Object.keys(rows[0]);
-
-    const csv = [
-        headers.map(csvEscape).join(","),
-        ...rows.map(row =>
-            headers
-                .map(key => csvEscape(row[key]))
-                .join(",")
+BEGIN;
+
+CREATE OR REPLACE FUNCTION public.admin_dashboard_summary()
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+    v_total_rooms bigint;
+    v_bookable_rooms bigint;
+    v_full_rooms bigint;
+    v_rooms_with_vacancy bigint;
+
+    v_total_beds bigint;
+    v_occupied_beds bigint;
+    v_available_beds bigint;
+    v_maintenance_beds bigint;
+
+    v_total_students bigint;
+    v_eligible_students bigint;
+    v_activated_students bigint;
+    v_allocated_students bigint;
+    v_unallocated_students bigint;
+
+    v_active_holds bigint;
+    v_active_allocations bigint;
+
+    v_male_students bigint;
+    v_female_students bigint;
+
+    v_allocation_open boolean;
+BEGIN
+    IF NOT public.is_admin() THEN
+        RAISE EXCEPTION 'Not authorised';
+    END IF;
+
+    SELECT
+        COUNT(*),
+        COUNT(*) FILTER (WHERE bookable = true),
+        COUNT(*) FILTER (
+            WHERE bookable = true
+            AND NOT EXISTS (
+                SELECT 1
+                FROM public.beds b
+                WHERE b.room_id = r.id
+                  AND b.status = 'AVAILABLE'
+            )
+        ),
+        COUNT(*) FILTER (
+            WHERE bookable = true
+            AND EXISTS (
+                SELECT 1
+                FROM public.beds b
+                WHERE b.room_id = r.id
+                  AND b.status = 'AVAILABLE'
+            )
         )
-    ].join("\r\n");
+    INTO
+        v_total_rooms,
+        v_bookable_rooms,
+        v_full_rooms,
+        v_rooms_with_vacancy
+    FROM public.rooms r
+    WHERE r.active = true;
 
-    const blob =
-        new Blob(
-            [csv],
-            {
-                type: "text/csv;charset=utf-8;"
-            }
-        );
+    SELECT
+        COUNT(*),
+        COUNT(*) FILTER (WHERE status = 'OCCUPIED'),
+        COUNT(*) FILTER (WHERE status = 'AVAILABLE'),
+        COUNT(*) FILTER (WHERE status = 'MAINTENANCE')
+    INTO
+        v_total_beds,
+        v_occupied_beds,
+        v_available_beds,
+        v_maintenance_beds
+    FROM public.beds;
 
-    const url =
-        URL.createObjectURL(blob);
-
-    const link =
-        document.createElement("a");
-
-    link.href = url;
-    link.download = filename;
-
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-
-    URL.revokeObjectURL(url);
-}
-
-
-async function signIn(event) {
-
-    event.preventDefault();
-
-    const email =
-        $("#email").value.trim();
-
-    const password =
-        $("#password").value;
-
-    const button =
-        $("#loginButton");
-
-    $("#loginError").textContent = "";
-
-    button.disabled = true;
-    button.textContent = "Signing in…";
-
-    try {
-
-        const {
-            error
-        } = await supabase.auth.signInWithPassword({
-            email,
-            password
-        });
-
-        if (error) {
-            throw error;
-        }
-
-        const role =
-            await getAdminRole();
-
-        $("#adminRole").textContent =
-            role === "super_admin"
-                ? "SUPER ADMIN"
-                : "ADMIN";
-
-        loginView.classList.add("hidden");
-        appView.classList.remove("hidden");
-
-        await loadEverything();
-
-    } catch (error) {
-
-        console.error(error);
-
-        $("#loginError").textContent =
-            error.message ||
-            "Unable to sign in.";
-
-        await supabase.auth.signOut();
-
-    } finally {
-
-        button.disabled = false;
-        button.textContent = "Sign in";
-    }
-}
-
-
-async function signOut() {
-
-    await supabase.auth.signOut();
-
-    appView.classList.add("hidden");
-    loginView.classList.remove("hidden");
-
-    $("#password").value = "";
-}
-
-
-async function initialise() {
-
-    const {
-        data: {
-            session
-        }
-    } = await supabase.auth.getSession();
-
-    if (!session) {
-        return;
-    }
-
-    try {
-
-        const role =
-            await getAdminRole();
-
-        $("#adminRole").textContent =
-            role === "super_admin"
-                ? "SUPER ADMIN"
-                : "ADMIN";
-
-        loginView.classList.add("hidden");
-        appView.classList.remove("hidden");
-
-        await loadEverything();
-
-    } catch (error) {
-
-        console.error(error);
-
-        await supabase.auth.signOut();
-    }
-}
-
-
-$("#loginForm")
-    .addEventListener(
-        "submit",
-        signIn
-    );
-
-$("#logoutButton")
-    .addEventListener(
-        "click",
-        signOut
-    );
-
-$("#refreshButton")
-    .addEventListener(
-        "click",
-        loadEverything
-    );
-
-$("#blockFilter")
-    .addEventListener(
-        "change",
-        loadRooms
-    );
-
-$("#genderFilter")
-    .addEventListener(
-        "change",
-        loadAllocations
-    );
-
-$("#allocationBlockFilter")
-    .addEventListener(
-        "change",
-        loadAllocations
-    );
-
-$("#studentSearch")
-    .addEventListener(
-        "input",
-        loadAllocations
-    );
-
-$("#unallocatedSearch")
-    .addEventListener(
-        "input",
-        loadUnallocated
-    );
-
-$("#closeModal")
-    .addEventListener(
-        "click",
-        () => $("#roomModal").classList.add("hidden")
-    );
-
-$(".modal-backdrop")
-    .addEventListener(
-        "click",
-        () => $("#roomModal").classList.add("hidden")
-    );
-
-$("#exportAllocations")
-    .addEventListener(
-        "click",
-        () =>
-            downloadCsv(
-                "asogli-hall-allocations.csv",
-                currentAllocations
+    SELECT
+        COUNT(*),
+        COUNT(*) FILTER (WHERE eligible = true),
+        COUNT(*) FILTER (WHERE access_code_activated_at IS NOT NULL),
+        COUNT(DISTINCT a.student_id) FILTER (WHERE a.status = 'ACTIVE'),
+        COUNT(*) FILTER (
+            WHERE eligible = true
+            AND NOT EXISTS (
+                SELECT 1
+                FROM public.allocations a2
+                WHERE a2.student_id = s.id
+                  AND a2.status = 'ACTIVE'
             )
+        )
+    INTO
+        v_total_students,
+        v_eligible_students,
+        v_activated_students,
+        v_allocated_students,
+        v_unallocated_students
+    FROM public.students s
+    LEFT JOIN public.allocations a
+        ON a.student_id = s.id
+       AND a.status = 'ACTIVE';
+
+    SELECT COUNT(*)
+    INTO v_active_holds
+    FROM public.holds
+    WHERE status = 'ACTIVE'
+      AND expires_at > now();
+
+    SELECT COUNT(*)
+    INTO v_active_allocations
+    FROM public.allocations
+    WHERE status = 'ACTIVE';
+
+    SELECT COUNT(*)
+    INTO v_male_students
+    FROM public.students
+    WHERE eligible = true
+      AND UPPER(gender) = 'MALE';
+
+    SELECT COUNT(*)
+    INTO v_female_students
+    FROM public.students
+    WHERE eligible = true
+      AND UPPER(gender) = 'FEMALE';
+
+    SELECT COALESCE(
+        (
+            SELECT value::boolean
+            FROM public.settings
+            WHERE key = 'allocation_open'
+            LIMIT 1
+        ),
+        false
+    )
+    INTO v_allocation_open;
+
+    RETURN jsonb_build_object(
+        'students', jsonb_build_object(
+            'total', v_total_students,
+            'eligible', v_eligible_students,
+            'activated', v_activated_students,
+            'allocated', v_allocated_students,
+            'unallocated', v_unallocated_students
+        ),
+        'rooms', jsonb_build_object(
+            'total', v_total_rooms,
+            'bookable', v_bookable_rooms,
+            'full', v_full_rooms,
+            'with_vacancy', v_rooms_with_vacancy
+        ),
+        'beds', jsonb_build_object(
+            'total', v_total_beds,
+            'occupied', v_occupied_beds,
+            'available', v_available_beds,
+            'maintenance', v_maintenance_beds
+        ),
+        'holds', jsonb_build_object(
+            'active', v_active_holds
+        ),
+        'allocations', jsonb_build_object(
+            'active', v_active_allocations
+        ),
+        'gender', jsonb_build_object(
+            'male', v_male_students,
+            'female', v_female_students
+        ),
+        'allocation_open', v_allocation_open
     );
-
-$("#exportUnallocated")
-    .addEventListener(
-        "click",
-        () =>
-            downloadCsv(
-                "asogli-hall-unallocated.csv",
-                currentUnallocated
-            )
-    );
-
-$("#printReport")
-    .addEventListener(
-        "click",
-        () => window.print()
-    );
+END;
+$$;
 
 
-initialise();
+DROP FUNCTION IF EXISTS public.admin_rooms(text);
+
+CREATE FUNCTION public.admin_rooms(p_block text DEFAULT NULL)
+RETURNS TABLE (
+    room_id uuid,
+    room_code text,
+    block text,
+    floor text,
+    room_number text,
+    capacity integer,
+    room_gender text,
+    active boolean,
+    bookable boolean,
+    temporarily_locked boolean,
+    occupied_beds bigint,
+    available_beds bigint,
+    occupancy_percent integer
+)
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+    IF NOT public.is_admin() THEN
+        RAISE EXCEPTION 'Not authorised';
+    END IF;
+
+    RETURN QUERY
+    SELECT
+        r.id AS room_id,
+        r.room_code,
+        r.block,
+        r.floor,
+        r.room_number,
+        r.capacity,
+
+        CASE
+            WHEN UPPER(COALESCE(r.gender_rule, '')) = 'MALE'
+                THEN 'Male'
+            WHEN UPPER(COALESCE(r.gender, '')) = 'MALE'
+                THEN 'Male'
+            WHEN UPPER(COALESCE(r.gender, '')) = 'FEMALE'
+                THEN 'Female'
+            WHEN COUNT(s.id) FILTER (
+                WHERE UPPER(s.gender) = 'MALE'
+            ) > 0
+            AND COUNT(s.id) FILTER (
+                WHERE UPPER(s.gender) = 'FEMALE'
+            ) > 0
+                THEN 'Mixed'
+            WHEN COUNT(s.id) FILTER (
+                WHERE UPPER(s.gender) = 'MALE'
+            ) > 0
+                THEN 'Male'
+            WHEN COUNT(s.id) FILTER (
+                WHERE UPPER(s.gender) = 'FEMALE'
+            ) > 0
+                THEN 'Female'
+            ELSE 'Neutral'
+        END AS room_gender,
+
+        r.active,
+        r.bookable,
+        r.temporarily_locked,
+
+        COUNT(b.id) FILTER (
+            WHERE b.status = 'OCCUPIED'
+        ) AS occupied_beds,
+
+        COUNT(b.id) FILTER (
+            WHERE b.status = 'AVAILABLE'
+        ) AS available_beds,
+
+        CASE
+            WHEN r.capacity > 0 THEN
+                ROUND(
+                    (
+                        COUNT(b.id) FILTER (
+                            WHERE b.status = 'OCCUPIED'
+                        )::numeric
+                        / r.capacity
+                    ) * 100
+                )::integer
+            ELSE 0
+        END AS occupancy_percent
+
+    FROM public.rooms r
+    LEFT JOIN public.beds b
+        ON b.room_id = r.id
+    LEFT JOIN public.allocations a
+        ON a.bed_id = b.id
+       AND a.status = 'ACTIVE'
+    LEFT JOIN public.students s
+        ON s.id = a.student_id
+
+    WHERE r.active = true
+      AND (
+          p_block IS NULL
+          OR p_block = ''
+          OR r.block = p_block
+      )
+
+    GROUP BY
+        r.id,
+        r.room_code,
+        r.block,
+        r.floor,
+        r.room_number,
+        r.capacity,
+        r.gender,
+        r.gender_rule,
+        r.active,
+        r.bookable,
+        r.temporarily_locked
+
+    ORDER BY
+        r.block,
+        CASE
+            WHEN r.room_number ~ '^[0-9]+$'
+                THEN r.room_number::integer
+            ELSE 999999
+        END,
+        r.room_number;
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.admin_dashboard_summary()
+TO authenticated;
+
+GRANT EXECUTE ON FUNCTION public.admin_rooms(text)
+TO authenticated;
+
+COMMIT;
