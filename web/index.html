@@ -1,24 +1,12 @@
 <!doctype html>
 <html lang="en">
-
 <head>
-
   <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
 
-  <meta
-    name="viewport"
-    content="width=device-width, initial-scale=1"
-  >
+  <title>UHAS MSA Room Allocation</title>
 
-  <title>
-    UHAS MSA Room Allocation
-  </title>
-
-  <link
-    rel="stylesheet"
-    href="styles.css"
-  >
-
+  <link rel="stylesheet" href="styles.css">
 </head>
 
 <body>
@@ -26,23 +14,13 @@
 <main>
 
   <header>
-
-    <h1>
-      UHAS MSA Room Allocation
-    </h1>
-
-    <p>
-      Self-Service Accommodation Portal
-    </p>
-
+    <h1>UHAS MSA Room Allocation</h1>
+    <p>Self-Service Accommodation Portal</p>
   </header>
 
-
+  <!-- LOGIN -->
   <section id="login">
-
-    <h2>
-      Student Login
-    </h2>
+    <h2>Student Login</h2>
 
     <p>
       Enter your index number and unique access code.
@@ -59,7 +37,6 @@
       placeholder="e.g. UHAS202400001"
     >
 
-
     <label for="accessCode">
       Unique Access Code
     </label>
@@ -75,31 +52,119 @@
       Continue
     </button>
 
-    <p
-      id="msg"
-      role="alert"
-    ></p>
+    <p id="msg" role="alert"></p>
+  </section>
+
+
+  <!-- GENDER -->
+  <section id="genderSelection" hidden>
+
+    <h2>Select Gender</h2>
+
+    <p>
+      Please select your gender before continuing to room selection.
+    </p>
+
+    <div class="choices">
+
+      <button
+        class="choice-button gender-choice"
+        data-gender="MALE"
+      >
+        <strong>Male</strong>
+        <span>Male accommodation allocation</span>
+      </button>
+
+      <button
+        class="choice-button gender-choice"
+        data-gender="FEMALE"
+      >
+        <strong>Female</strong>
+        <span>Female accommodation allocation</span>
+      </button>
+
+    </div>
+
+    <p id="genderMessage" role="alert"></p>
 
   </section>
 
 
-  <section
-    id="rooms"
-    hidden
-  >
+  <!-- BLOCK -->
+  <section id="blockSelection" hidden>
 
-    <h2>
-      Available Rooms
-    </h2>
+    <h2>Select Hostel Block</h2>
 
-    <div
-      id="grid"
-      class="grid"
-    ></div>
+    <p>
+      Choose the block where you want to look for an available room.
+    </p>
+
+    <div class="choices">
+
+      <button
+        class="choice-button block-choice"
+        data-block="Ahoe"
+      >
+        <strong>Ahoe</strong>
+        <span>View available Ahoe rooms</span>
+      </button>
+
+      <button
+        class="choice-button block-choice"
+        data-block="Bankoe"
+      >
+        <strong>Bankoe</strong>
+        <span>View available Bankoe rooms</span>
+      </button>
+
+      <button
+        class="choice-button block-choice"
+        data-block="Dome"
+      >
+        <strong>Dome</strong>
+        <span>View available Dome rooms</span>
+      </button>
+
+      <button
+        class="choice-button block-choice"
+        data-block="Hliha"
+      >
+        <strong>Hliha</strong>
+        <span>View available Hliha rooms</span>
+      </button>
+
+    </div>
+
+    <p id="blockMessage" role="alert"></p>
 
   </section>
 
 
+  <!-- ROOMS -->
+  <section id="rooms" hidden>
+
+    <div class="section-heading">
+
+      <div>
+        <h2>Available Rooms</h2>
+        <p id="roomSubtitle"></p>
+      </div>
+
+      <button
+        id="changeBlockButton"
+        class="secondary-button"
+      >
+        Change Block
+      </button>
+
+    </div>
+
+    <div id="grid" class="grid"></div>
+
+  </section>
+
+
+  <!-- ALLOCATION / HOLD -->
   <section
     id="allocation"
     hidden
@@ -114,5 +179,4 @@
 ></script>
 
 </body>
-
 </html>
