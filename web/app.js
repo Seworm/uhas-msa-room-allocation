@@ -1,580 +1,554 @@
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { createClient } from
+  'https://esm.sh/@supabase/supabase-js@2';
 
 import {
   SUPABASE_URL,
   SUPABASE_PUBLISHABLE_KEY
 } from './config.js';
 
-const sb = createClient(
+const supabase = createClient(
   SUPABASE_URL,
   SUPABASE_PUBLISHABLE_KEY
 );
 
-const $ = (id) => document.getElementById(id);
-let availableRooms = [];
+const loginSection =
+  document.getElementById('login');
 
-function esc(value) {
-  return String(value ?? '').replace(/[&<>"']/g, (char) => ({
-    '&': '&amp;',
-    '<': '&lt;',
-    '>': '&gt;',
-    '"': '&quot;',
-    "'": '&#039;'
-  }[char]));
+const roomsSection =
+  document.getElementById('rooms');
+
+const allocationSection =
+  document.getElementById('allocation');
+
+const indexInput =
+  document.getElementById('index');
+
+const accessCodeInput =
+  document.getElementById('accessCode');
+
+const loginButton =
+  document.getElementById('loginButton');
+
+const msg =
+  document.getElementById('msg');
+
+const grid =
+  document.getElementById('grid');
+
+function showMessage(text, type = '') {
+  msg.textContent = text;
+  msg.className = type;
 }
 
+function escapeHtml(value) {
+  return String(value ?? '')
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#039;');
+}
 
-// ============================================================
-// STUDENT ACCESS
-// ============================================================
+async function ensureSession() {
 
-$('activate').onclick = activateStudent;
+  const {
+    data: {
+      session
+    }
+  } = await supabase.auth.getSession();
 
-restoreStudentSession();
+  if (session) {
+    return session;
+  }
 
-$('accessCode').addEventListener('input', () => {
-  $('accessCode').value =
-    $('accessCode').value
-      .replace(/\s/g, '')
-      .toUpperCase();
-});
+  const {
+    data,
+    error
+  } = await supabase.auth.signInAnonymously();
 
+  if (error) {
+    throw new Error(
+      'Unable to start secure session. Please try again.'
+    );
+  }
+
+  return data.session;
+}
 
 async function activateStudent() {
 
   const studentId =
-    $('studentId').value
-      .trim()
-      .toUpperCase()
-      .replace(/\s+/g, '');
+    indexInput.value.trim();
 
   const accessCode =
-    $('accessCode').value
-      .trim()
-      .toUpperCase()
-      .replace(/\s+/g, '');
+    accessCodeInput.value.trim();
 
-  if (!studentId) {
-    $('msg').textContent =
-      'Enter your index number.';
+  if (!studentId || !accessCode) {
+    showMessage(
+      'Enter your index number and access code.',
+      'error'
+    );
     return;
   }
 
-  if (!accessCode) {
-    $('msg').textContent =
-      'Enter your access code.';
-    return;
-  }
+  loginButton.disabled = true;
 
-  $('activate').disabled = true;
-  $('msg').textContent =
-    'Verifying your access code...';
+  showMessage(
+    'Verifying your details...'
+  );
 
   try {
 
-    // Access-code verification happens only in the Edge Function. It creates
-    // a standard Supabase Auth identity and returns its session on success.
-    await sb.auth.signOut();
+    await ensureSession();
 
-    const response = await fetch(
-      `${SUPABASE_URL}/functions/v1/student-login`,
+    const {
+      data,
+      error
+    } = await supabase.functions.invoke(
+      'student-login',
       {
-        method: 'POST',
-        headers: {
-          apikey: SUPABASE_PUBLISHABLE_KEY,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
+        body: {
           student_id: studentId,
-          access_code: accessCode
-        })
+          access_code: accessCode,
+        },
       }
     );
 
-    const data = await response.json();
-
-    if (!response.ok || !data?.session) {
+    if (error || !data?.success) {
       throw new Error(
-        data?.error || 'Unable to verify your access code.'
+        data?.error ||
+        'Invalid index number or access code.'
       );
     }
 
-    const { error: sessionError } = await sb.auth.setSession(data.session);
+    showMessage(
+      `Welcome, ${data.student.student_name}.`
+    );
 
-    if (sessionError) throw sessionError;
+    loginSection.hidden = true;
 
-    $('login').hidden = true;
-
-    $('studentInfo').hidden = false;
-
-    $('studentInfo').innerHTML = `
-      <h2>Welcome</h2>
-
-      <p>
-        <b>${esc(data.student.student_name)}</b>
-      </p>
-
-      <p>
-        Index Number:
-        <b>${esc(data.student.index_number)}</b>
-      </p>
-
-      <p>
-        Your access code has been successfully activated.
-      </p>
-    `;
-
-    $('msg').textContent =
-      'Access verified. Loading available rooms...';
-
-    await startBookingFlow();
+    await loadRooms();
 
   } catch (error) {
 
-    console.error(error);
+    showMessage(
+      error.message ||
+      'Unable to sign in.',
+      'error'
+    );
 
-    $('activate').disabled = false;
+  } finally {
 
-    let message =
-      error?.message ||
-      'Unable to verify your access code.';
+    loginButton.disabled = false;
 
-    if (
-      message.toLowerCase().includes('already been used')
-    ) {
-      message =
-        'This access code has already been used.';
-    }
-
-    if (
-      message.toLowerCase().includes('invalid index')
-    ) {
-      message =
-        'Invalid index number or access code.';
-    }
-
-    $('msg').textContent = message;
   }
 }
-
-async function restoreStudentSession() {
-  const {
-    data: { user }
-  } = await sb.auth.getUser();
-
-  if (!user) return;
-
-  const { data: student, error } = await sb
-    .from('students')
-    .select('student_id, student_name, gender')
-    .maybeSingle();
-
-  if (error || !student) {
-    await sb.auth.signOut();
-    return;
-  }
-
-  $('login').hidden = true;
-  $('studentInfo').hidden = false;
-  $('studentInfo').innerHTML = `
-    <h2>Welcome back</h2>
-    <p><b>${esc(student.student_name)}</b></p>
-    <p>Index Number: <b>${esc(student.student_id)}</b></p>
-  `;
-  if (student.gender) {
-    await loadRooms();
-  } else {
-    showGenderSelection();
-  }
-}
-
-async function startBookingFlow() {
-  const { data: student, error } = await sb
-    .from('students')
-    .select('gender')
-    .maybeSingle();
-
-  if (error) throw error;
-  if (student?.gender) {
-    await loadRooms();
-  } else {
-    showGenderSelection();
-  }
-}
-
-function showGenderSelection() {
-  $('genderSelection').hidden = false;
-  $('blocks').hidden = true;
-  $('rooms').hidden = true;
-  $('msg').textContent = 'Choose your gender to continue.';
-
-  document.querySelectorAll('[data-gender]').forEach((button) => {
-    button.onclick = () => saveGender(button.dataset.gender);
-  });
-}
-
-async function saveGender(gender) {
-  $('msg').textContent = 'Saving your gender selection...';
-  const genderButtons = [...document.querySelectorAll('[data-gender]')];
-  genderButtons.forEach((button) => { button.disabled = true; });
-  try {
-    const { error } = await sb.rpc('set_student_gender', { p_gender: gender });
-    if (error) throw error;
-    $('genderSelection').hidden = true;
-    await loadRooms();
-  } catch (error) {
-    console.error(error);
-    const message = error?.message || 'Unable to save your gender selection.';
-    $('msg').textContent = message.includes('set_student_gender')
-      ? 'Gender selection is not available yet. Please apply the latest Supabase migration and try again.'
-      : message;
-    genderButtons.forEach((button) => { button.disabled = false; });
-  }
-}
-
-
-// ============================================================
-// LOAD ROOMS
-// ============================================================
 
 async function loadRooms() {
 
-  $('msg').textContent =
-    'Checking available rooms...';
+  roomsSection.hidden = false;
+
+  grid.innerHTML =
+    '<p>Loading available rooms...</p>';
+
+  const {
+    data,
+    error
+  } = await supabase.functions.invoke(
+    'rooms'
+  );
+
+  if (error) {
+
+    grid.innerHTML =
+      '<p>Unable to load rooms.</p>';
+
+    return;
+  }
+
+  const rooms =
+    data?.rooms ?? [];
+
+  if (!rooms.length) {
+
+    grid.innerHTML =
+      '<p>No rooms are currently available.</p>';
+
+    return;
+  }
+
+  grid.innerHTML =
+    rooms.map(room => `
+      <article class="room-card">
+        <h3>
+          ${escapeHtml(room.room_code)}
+        </h3>
+
+        <p>
+          ${escapeHtml(room.block)}
+          · Floor ${escapeHtml(room.floor)}
+        </p>
+
+        <p>
+          Room ${escapeHtml(room.room_number)}
+        </p>
+
+        <p>
+          <strong>
+            ${room.available_beds}
+          </strong>
+          bed(s) available
+        </p>
+
+        <button
+          class="select-room"
+          data-room-id="${escapeHtml(room.id)}"
+        >
+          Select Room
+        </button>
+      </article>
+    `).join('');
+
+  document
+    .querySelectorAll('.select-room')
+    .forEach(button => {
+
+      button.addEventListener(
+        'click',
+        () => holdRoom(button.dataset.roomId)
+      );
+
+    });
+}
+
+async function holdRoom(roomId) {
+
+  const buttons =
+    document.querySelectorAll('.select-room');
+
+  buttons.forEach(
+    button => button.disabled = true
+  );
 
   try {
 
     const {
-      data: { session }
-    } = await sb.auth.getSession();
-
-    if (!session) {
-      throw new Error(
-        'Your session has expired. Please reload the page.'
-      );
-    }
-
-    const response = await fetch(
-      `${SUPABASE_URL}/functions/v1/rooms`,
+      data,
+      error
+    } = await supabase.functions.invoke(
+      'allocate-room',
       {
-        method: 'GET',
-
-        headers: {
-          Authorization:
-            `Bearer ${session.access_token}`,
-
-          apikey:
-            SUPABASE_PUBLISHABLE_KEY
-        }
+        body: {
+          action: 'hold',
+          room_id: roomId,
+        },
       }
     );
 
-    const data =
-      await response.json();
-
-    if (!response.ok || data.error) {
+    if (error) {
       throw new Error(
-        data.error ||
-        'Unable to load available rooms.'
+        error.message ||
+        'Unable to hold room.'
       );
     }
 
-    availableRooms = data.rooms || [];
-
-    if (availableRooms.length === 0) {
-
-      $('blocks').hidden = false;
-      $('blockGrid').innerHTML =
-        '<p>No rooms are currently available.</p>';
-
-      $('msg').textContent =
-        'There are currently no rooms available.';
-
-      return;
+    if (data?.error) {
+      throw new Error(data.error);
     }
 
-    renderBlocks();
+    showHoldConfirmation(data);
 
   } catch (error) {
 
-    console.error(error);
+    alert(
+      error.message ||
+      'Unable to hold this room.'
+    );
 
-    $('msg').textContent =
-      error?.message ||
-      'Unable to connect to the allocation server.';
+    await loadRooms();
+
   }
 }
 
-function renderBlocks() {
-  const blocks = [...new Set(availableRooms.map((room) => room.block))];
-  $('blocks').hidden = false;
-  $('rooms').hidden = true;
-  $('blockGrid').innerHTML = blocks.map((block) => {
-    const rooms = availableRooms.filter((room) => room.block === block);
-    const beds = rooms.reduce((total, room) => total + Number(room.available_beds), 0);
-    return `<article>
-      <h3>${esc(block)}</h3>
-      <p><b>${esc(rooms.length)}</b> room(s) · <b>${esc(beds)}</b> bed(s) available</p>
-      <button data-block="${esc(block)}">Select block</button>
-    </article>`;
-  }).join('');
+function showHoldConfirmation(hold) {
 
-  document.querySelectorAll('[data-block]').forEach((button) => {
-    button.onclick = () => renderRooms(button.dataset.block);
-  });
-  $('msg').textContent = 'Select a block.';
-}
+  allocationSection.hidden = false;
 
-function renderRooms(block) {
-  const rooms = availableRooms.filter((room) => room.block === block);
-  $('blocks').hidden = true;
-  $('rooms').hidden = false;
-  $('roomsHeading').textContent = `${block} — available rooms`;
-  $('grid').innerHTML =
-    rooms.map((room) => `
+  allocationSection.innerHTML = `
+    <div class="hold-box">
 
-        <article>
-
-          <h3>
-            ${esc(room.room_number)}
-            — ${esc(room.block)}
-          </h3>
-
-          <p>
-            ${esc(room.floor || '')}
-            ·
-            ${esc(room.room_type || '')}
-          </p>
-
-          <p>
-            <b>${esc(room.available_beds)}</b>
-            bed(s) available
-          </p>
-
-          <button
-            data-id="${esc(room.id)}"
-          >
-            Select room
-          </button>
-
-        </article>
-
-      `).join('');
-
-    document
-      .querySelectorAll('[data-id]')
-      .forEach((button) => {
-
-        button.onclick = () =>
-          hold(
-            button.dataset.id
-          );
-
-      });
-
-  $('backToBlocks').onclick = renderBlocks;
-  $('msg').textContent = 'Select an available room.';
-}
-
-
-// ============================================================
-// HOLD ROOM
-// ============================================================
-
-async function hold(roomId) {
-
-  $('msg').textContent =
-    'Reserving a bed temporarily...';
-
-  try {
-
-    const {
-      data: { session }
-    } = await sb.auth.getSession();
-
-    if (!session) {
-      throw new Error(
-        'Your session has expired.'
-      );
-    }
-
-    const response = await fetch(
-      `${SUPABASE_URL}/functions/v1/allocate-room`,
-      {
-        method: 'POST',
-
-        headers: {
-          Authorization:
-            `Bearer ${session.access_token}`,
-
-          apikey:
-            SUPABASE_PUBLISHABLE_KEY,
-
-          'Content-Type':
-            'application/json'
-        },
-
-        body: JSON.stringify({
-          action: 'hold',
-          room_id: roomId
-        })
-      }
-    );
-
-    const data =
-      await response.json();
-
-    if (!response.ok || data.error) {
-      throw new Error(
-        data.error ||
-        'Unable to reserve this room.'
-      );
-    }
-
-    $('rooms').hidden = true;
-    $('studentInfo').hidden = true;
-    $('allocation').hidden = false;
-
-    $('allocation').innerHTML = `
-
-      <h2>Room Temporarily Held</h2>
+      <h2>Room temporarily held</h2>
 
       <p>
-        Hold expires:
-        <b>
-          ${new Date(
-            data.expires_at
-          ).toLocaleString()}
-        </b>
+        Room:
+        <strong>
+          ${escapeHtml(hold.room_code)}
+        </strong>
       </p>
 
       <p>
-        Please confirm your allocation
-        before the hold expires.
+        Bed:
+        <strong>
+          ${escapeHtml(hold.bed_number)}
+        </strong>
       </p>
 
-      <button id="confirm">
+      <p>
+        You have a short time to confirm this allocation.
+      </p>
+
+      <button id="confirmAllocation">
         Confirm Allocation
       </button>
 
-    `;
+      <p id="holdMessage"></p>
 
-    $('confirm').onclick =
-      () => confirmHold(
-        data.hold_id
-      );
+    </div>
+  `;
 
-    $('msg').textContent = '';
-
-  } catch (error) {
-
-    console.error(error);
-
-    $('msg').textContent =
-      error?.message ||
-      'Unable to reserve this room.';
-  }
+  document
+    .getElementById('confirmAllocation')
+    .addEventListener(
+      'click',
+      () => confirmAllocation(hold.hold_id)
+    );
 }
 
+async function confirmAllocation(holdId) {
 
-// ============================================================
-// CONFIRM ALLOCATION
-// ============================================================
+  const button =
+    document.getElementById(
+      'confirmAllocation'
+    );
 
-async function confirmHold(holdId) {
+  const message =
+    document.getElementById(
+      'holdMessage'
+    );
 
-  $('msg').textContent =
-    'Confirming your allocation...';
+  button.disabled = true;
+
+  message.textContent =
+    'Confirming allocation...';
 
   try {
 
     const {
-      data: { session }
-    } = await sb.auth.getSession();
-
-    if (!session) {
-      throw new Error(
-        'Your session has expired.'
-      );
-    }
-
-    const response = await fetch(
-      `${SUPABASE_URL}/functions/v1/allocate-room`,
+      data,
+      error
+    } = await supabase.functions.invoke(
+      'allocate-room',
       {
-        method: 'POST',
-
-        headers: {
-          Authorization:
-            `Bearer ${session.access_token}`,
-
-          apikey:
-            SUPABASE_PUBLISHABLE_KEY,
-
-          'Content-Type':
-            'application/json'
-        },
-
-        body: JSON.stringify({
+        body: {
           action: 'confirm',
-          hold_id: holdId
-        })
+          hold_id: holdId,
+        },
       }
     );
 
-    const data =
-      await response.json();
-
-    if (!response.ok || data.error) {
+    if (error) {
       throw new Error(
-        data.error ||
+        error.message ||
         'Unable to confirm allocation.'
       );
     }
 
-    $('allocation').innerHTML = `
+    if (data?.error) {
+      throw new Error(data.error);
+    }
 
-      <div class="success">
+    allocationSection.innerHTML = `
+      <div class="success-box">
 
         <h2>Allocation Confirmed</h2>
 
         <p>
-          <b>Student:</b>
-          ${esc(data.student_name)}
+          Allocation Number:
+          <strong>
+            ${escapeHtml(data.allocation_number)}
+          </strong>
         </p>
 
         <p>
-          <b>Room:</b>
-          ${esc(data.room_number)}
-          (${esc(data.block)})
+          Student:
+          ${escapeHtml(data.student_name)}
         </p>
 
         <p>
-          <b>Bed:</b>
-          ${esc(data.bed_number)}
+          Room:
+          <strong>
+            ${escapeHtml(data.room_code)}
+          </strong>
         </p>
 
         <p>
-          <b>Allocation ID:</b>
-          ${esc(data.allocation_number)}
+          Block:
+          ${escapeHtml(data.block)}
         </p>
 
         <p>
-          Please save your allocation ID
-          for your records.
+          Room Number:
+          ${escapeHtml(data.room_number)}
+        </p>
+
+        <p>
+          Bed:
+          <strong>
+            ${escapeHtml(data.bed_number)}
+          </strong>
+        </p>
+
+        <p>
+          Please save your allocation number.
         </p>
 
       </div>
-
     `;
 
-    $('msg').textContent = '';
+    roomsSection.hidden = true;
 
   } catch (error) {
 
-    console.error(error);
-
-    $('msg').textContent =
-      error?.message ||
+    message.textContent =
+      error.message ||
       'Unable to confirm allocation.';
+
+    button.disabled = false;
+
+    await loadRooms();
+
   }
 }
+
+async function loadExistingAllocation() {
+
+  try {
+
+    const {
+      data,
+      error
+    } = await supabase.functions.invoke(
+      'my-allocation'
+    );
+
+    if (error || !data?.allocation) {
+      return false;
+    }
+
+    loginSection.hidden = true;
+    roomsSection.hidden = true;
+    allocationSection.hidden = false;
+
+    const allocation =
+      data.allocation;
+
+    const bed =
+      allocation.beds;
+
+    const room =
+      bed?.rooms;
+
+    allocationSection.innerHTML = `
+      <div class="success-box">
+
+        <h2>Your Allocation</h2>
+
+        <p>
+          Allocation Number:
+          <strong>
+            ${escapeHtml(
+              allocation.allocation_number
+            )}
+          </strong>
+        </p>
+
+        <p>
+          Room:
+          <strong>
+            ${escapeHtml(
+              room?.room_code
+            )}
+          </strong>
+        </p>
+
+        <p>
+          Block:
+          ${escapeHtml(room?.block)}
+        </p>
+
+        <p>
+          Room Number:
+          ${escapeHtml(room?.room_number)}
+        </p>
+
+        <p>
+          Bed:
+          <strong>
+            ${escapeHtml(
+              bed?.bed_number
+            )}
+          </strong>
+        </p>
+
+      </div>
+    `;
+
+    return true;
+
+  } catch {
+
+    return false;
+
+  }
+}
+
+loginButton.addEventListener(
+  'click',
+  activateStudent
+);
+
+accessCodeInput.addEventListener(
+  'keydown',
+  event => {
+
+    if (event.key === 'Enter') {
+      activateStudent();
+    }
+
+  }
+);
+
+indexInput.addEventListener(
+  'keydown',
+  event => {
+
+    if (event.key === 'Enter') {
+      activateStudent();
+    }
+
+  }
+);
+
+
+/*
+ * Restore an existing browser session.
+ */
+(async () => {
+
+  try {
+
+    const {
+      data: {
+        session
+      }
+    } = await supabase.auth.getSession();
+
+    if (session) {
+      await loadExistingAllocation();
+    }
+
+  } catch {
+    // Remain on login screen.
+  }
+
+})();

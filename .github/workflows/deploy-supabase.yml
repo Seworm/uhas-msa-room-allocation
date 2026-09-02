@@ -1,26 +1,66 @@
-name: Deploy Supabase
+name: Deploy UHAS MSA Supabase
+
 on:
   push:
-    branches: [main]
-    paths: ['supabase/**']
+    branches:
+      - main
+    paths:
+      - "supabase/**"
   workflow_dispatch:
-concurrency: supabase-production
+
+concurrency:
+  group: supabase-production
+  cancel-in-progress: false
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
+
     steps:
-      - uses: actions/checkout@v4
-      - uses: supabase/setup-cli@v1
-        with: {version: latest}
-      - run: supabase link --project-ref "${{ secrets.gepwifrsudifmcjfeugs }}"
-        env: {SUPABASE_ACCESS_TOKEN: '${{ secrets.sbp_79385e5cec19c20fe8be0e8e10a0c348f0859197 }}'}
-      - run: supabase db push
-        env: {SUPABASE_ACCESS_TOKEN: '${{ secrets.sbp_79385e5cec19c20fe8be0e8e10a0c348f0859197 }}'}
-      - run: supabase functions deploy rooms
-        env: {SUPABASE_ACCESS_TOKEN: '${{ secrets.sbp_79385e5cec19c20fe8be0e8e10a0c348f0859197 }}'}
-      - run: supabase functions deploy allocate-room
-        env: {SUPABASE_ACCESS_TOKEN: '${{ secrets.sbp_79385e5cec19c20fe8be0e8e10a0c348f0859197 }}'}
-      - run: supabase functions deploy my-allocation
-        env: {SUPABASE_ACCESS_TOKEN: '${{ secrets.sbp_79385e5cec19c20fe8be0e8e10a0c348f0859197 }}'}
-      - run: supabase functions deploy student-login
-        env: {SUPABASE_ACCESS_TOKEN: '${{ secrets.sbp_79385e5cec19c20fe8be0e8e10a0c348f0859197 }}'}
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Link Supabase project
+        run: |
+          supabase link --project-ref "${{ secrets.SUPABASE_PROJECT_REF }}"
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+      - name: Apply database migrations
+        run: |
+          supabase db push
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+      - name: Deploy rooms function
+        run: |
+          supabase functions deploy rooms
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+      - name: Deploy allocate-room function
+        run: |
+          supabase functions deploy allocate-room
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+      - name: Deploy my-allocation function
+        run: |
+          supabase functions deploy my-allocation
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+      - name: Deploy student-login function
+        run: |
+          supabase functions deploy student-login
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+      - name: Deployment complete
+        run: |
+          echo "UHAS MSA Supabase deployment completed."

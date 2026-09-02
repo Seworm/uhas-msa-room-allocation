@@ -1,15 +1,24 @@
 <!doctype html>
 <html lang="en">
+
 <head>
+
   <meta charset="utf-8">
+
   <meta
     name="viewport"
-    content="width=device-width,initial-scale=1"
+    content="width=device-width, initial-scale=1"
   >
 
-  <title>UHAS MSA Room Allocation</title>
+  <title>
+    UHAS MSA Room Allocation
+  </title>
 
-  <link rel="stylesheet" href="styles.css">
+  <link
+    rel="stylesheet"
+    href="styles.css"
+  >
+
 </head>
 
 <body>
@@ -17,70 +26,93 @@
 <main>
 
   <header>
-    <h1>UHAS MSA Room Allocation</h1>
-    <p>Student accommodation portal</p>
+
+    <h1>
+      UHAS MSA Room Allocation
+    </h1>
+
+    <p>
+      Self-Service Accommodation Portal
+    </p>
+
   </header>
 
-  <p id="msg" role="status" aria-live="polite"></p>
 
   <section id="login">
 
-    <h2>Student Access</h2>
+    <h2>
+      Student Login
+    </h2>
 
     <p>
-      Enter your index number and your unique access code.
+      Enter your index number and unique access code.
     </p>
 
+    <label for="index">
+      Index Number
+    </label>
+
     <input
-      id="studentId"
+      id="index"
       type="text"
-      placeholder="Index Number"
-      autocomplete="off"
+      autocomplete="username"
+      placeholder="e.g. UHAS202400001"
     >
+
+
+    <label for="accessCode">
+      Unique Access Code
+    </label>
 
     <input
       id="accessCode"
       type="password"
-      placeholder="Access Code"
       autocomplete="current-password"
-      maxlength="12"
+      placeholder="Enter your access code"
     >
 
-    <button id="activate">
+    <button id="loginButton">
       Continue
     </button>
 
-  </section>
-
-  <section id="studentInfo" hidden></section>
-
-  <section id="genderSelection" hidden>
-    <h2>Choose your gender</h2>
-    <p>Your choice determines the rooms you can book and cannot be changed later.</p>
-    <div class="choices">
-      <button type="button" data-gender="MALE">Male</button>
-      <button type="button" data-gender="FEMALE">Female</button>
-    </div>
-  </section>
-
-  <section id="blocks" hidden>
-    <h2>Select a block</h2>
-    <div id="blockGrid" class="grid"></div>
-  </section>
-
-  <section id="rooms" hidden>
-    <h2 id="roomsHeading">Available rooms</h2>
-    <button id="backToBlocks" type="button">← Change block</button>
-
-    <div id="grid" class="grid"></div>
+    <p
+      id="msg"
+      role="alert"
+    ></p>
 
   </section>
 
-  <section id="allocation" hidden></section>
+
+  <section
+    id="rooms"
+    hidden
+  >
+
+    <h2>
+      Available Rooms
+    </h2>
+
+    <div
+      id="grid"
+      class="grid"
+    ></div>
+
+  </section>
+
+
+  <section
+    id="allocation"
+    hidden
+  ></section>
 
 </main>
 
-<script type="module" src="app.js"></script>
+
+<script
+  type="module"
+  src="app.js"
+></script>
 
 </body>
+
 </html>
