@@ -1,23 +1,25 @@
-BEGIN;
-
--- The imported student list has no verified gender data.  Students choose one
+-- The imported student list has no verified gender data. Students choose one
 -- value when they first sign in; it is then used by every allocation check.
-ALTER TABLE public.students
-  ADD CONSTRAINT students_gender_choice_check
-  CHECK (gender IS NULL OR gender IN ('MALE', 'FEMALE')) NOT VALID;
 
-ALTER TABLE public.rooms
-  ADD COLUMN IF NOT EXISTS bookable BOOLEAN NOT NULL DEFAULT TRUE,
-  ALTER COLUMN gender SET DEFAULT 'ALL';
-
--- Normalize imported rooms before adding constraints.  Existing room imports
--- used a blank gender value, so the policy must be populated first.
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_constraint
+    WHERE conname = 'students_gender_choice_check'
+      AND conrelid = 'public.students'::regclass
+  ) THEN
+    ALTER TABLE public.students
+      ADD CONSTRAINT students_gender_choice_check
+      CHECK (gender IS NULL OR gender IN ('MALE', 'FEMALE')) NOT VALID;
+  END IF;
+END
+$$;
 UPDATE public.rooms
-SET gender = CASE
-  WHEN block = 'Dome' AND room_number ~ '^(3[1-9]|40)$' THEN 'MALE'
-  ELSE 'ALL'
-END,
-bookable = NOT (block = 'Hliha' AND room_number IN ('22', '26', '29'));
+SET bookable = NOT (
+  block = 'Hliha'
+  AND room_number IN ('22', '26', '29')
+);
 
 ALTER TABLE public.rooms
   ADD CONSTRAINT rooms_four_bed_capacity_check CHECK (capacity = 4) NOT VALID,
@@ -208,4 +210,4 @@ GRANT EXECUTE ON FUNCTION public.available_rooms_for_current_student() TO authen
 GRANT EXECUTE ON FUNCTION public.create_room_hold(UUID) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.confirm_room_allocation(UUID) TO authenticated;
 
-COMMIT;
+
