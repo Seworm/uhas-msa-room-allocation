@@ -10,7 +10,6 @@ const supabase = createClient(
   SUPABASE_PUBLISHABLE_KEY
 );
 
-
 // ==================================================
 // UHAS ASOGLI HALL ROOM ALLOCATION
 // Frontend application controller
@@ -78,9 +77,130 @@ const changeBlockButton =
 // --------------------------------------------------
 
 let currentStudent = null;
+
+let currentAllocation = null;
+
+let currentPortalData = null;
+
 let selectedBlock = null;
+
 let currentHold = null;
+
 let holdTimer = null;
+
+let portalTab = 'room';
+
+
+// --------------------------------------------------
+// STUDENT SESSION
+// --------------------------------------------------
+//
+// Multi-device architecture:
+// Each browser/device stores its own student session token.
+//
+// The token must be issued by student-login.
+// It must NOT be tied to the anonymous Supabase Auth UID.
+//
+// --------------------------------------------------
+
+const STUDENT_SESSION_KEY =
+  'uhas_student_session_token';
+
+const STUDENT_LOGOUT_KEY =
+  'uhas_student_logged_out';
+
+
+function getStudentSessionToken() {
+  return sessionStorage.getItem(
+    STUDENT_SESSION_KEY
+  );
+}
+
+
+function setStudentSessionToken(token) {
+  if (!token) {
+    sessionStorage.removeItem(
+      STUDENT_SESSION_KEY
+    );
+
+    return;
+  }
+
+  sessionStorage.setItem(
+    STUDENT_SESSION_KEY,
+    token
+  );
+}
+
+
+function clearStudentSessionToken() {
+  sessionStorage.removeItem(
+    STUDENT_SESSION_KEY
+  );
+}
+
+
+function markStudentLoggedOut() {
+  sessionStorage.setItem(
+    STUDENT_LOGOUT_KEY,
+    '1'
+  );
+}
+
+
+function clearStudentLoggedOut() {
+  sessionStorage.removeItem(
+    STUDENT_LOGOUT_KEY
+  );
+}
+
+
+function wasStudentLoggedOut() {
+  return (
+    sessionStorage.getItem(
+      STUDENT_LOGOUT_KEY
+    ) === '1'
+  );
+}
+
+
+// --------------------------------------------------
+// SUPABASE INVOKE HELPER
+// --------------------------------------------------
+//
+// If student-login returns a student session token,
+// all protected student functions receive it here.
+//
+// The fallback to the Supabase session is retained
+// for compatibility with the current backend while
+// the multi-device backend is being deployed.
+//
+// --------------------------------------------------
+
+async function invokeStudentFunction(
+  functionName,
+  options = {}
+) {
+  const headers = {
+    ...(options.headers || {})
+  };
+
+  const studentToken =
+    getStudentSessionToken();
+
+  if (studentToken) {
+    headers.Authorization =
+      `Bearer ${studentToken}`;
+  }
+
+  return supabase.functions.invoke(
+    functionName,
+    {
+      ...options,
+      headers
+    }
+  );
+}
 
 
 // --------------------------------------------------
@@ -107,11 +227,19 @@ function applyBranding() {
 // HELPERS
 // --------------------------------------------------
 
-function showMessage(text, type = '') {
-  if (!msg) return;
+function showMessage(
+  text,
+  type = ''
+) {
+  if (!msg) {
+    return;
+  }
 
-  msg.textContent = text;
-  msg.className = type;
+  msg.textContent =
+    text;
+
+  msg.className =
+    type;
 }
 
 
@@ -165,11 +293,15 @@ function showSection(section) {
 }
 
 
-function disableButtons(selector, disabled) {
+function disableButtons(
+  selector,
+  disabled
+) {
   document
     .querySelectorAll(selector)
     .forEach(button => {
-      button.disabled = disabled;
+      button.disabled =
+        disabled;
     });
 }
 
@@ -179,18 +311,22 @@ function setLoading(
   loading,
   text = 'Loading...'
 ) {
-  if (!button) return;
+  if (!button) {
+    return;
+  }
 
   if (loading) {
     button.dataset.originalText =
       button.textContent;
 
-    button.disabled = true;
+    button.disabled =
+      true;
 
     button.innerHTML =
       `<span class="button-spinner" aria-hidden="true"></span>${escapeHtml(text)}`;
   } else {
-    button.disabled = false;
+    button.disabled =
+      false;
 
     button.textContent =
       button.dataset.originalText ||
@@ -205,7 +341,9 @@ function setLoading(
 
 function createApplicationHeader() {
   if (
-    document.querySelector('.app-brand-header')
+    document.querySelector(
+      '.app-brand-header'
+    )
   ) {
     return;
   }
@@ -231,15 +369,14 @@ function createApplicationHeader() {
     </div>
 
     <div class="brand-status">
-
       <span class="status-dot"></span>
-
       Accommodation Portal
-
     </div>
   `;
 
-  document.body.prepend(header);
+  document.body.prepend(
+    header
+  );
 }
 
 
@@ -260,7 +397,9 @@ function updateProgress(step) {
     progress.className =
       'allocation-progress';
 
-    document.body.appendChild(progress);
+    document.body.appendChild(
+      progress
+    );
   }
 
   const steps = [
@@ -272,30 +411,42 @@ function updateProgress(step) {
   ];
 
   progress.innerHTML =
-    steps.map((item, index) => {
-      const number =
-        index + 1;
+    steps
+      .map((item, index) => {
+        const number =
+          index + 1;
 
-      let state = '';
+        let state = '';
 
-      if (number < step) {
-        state = 'completed';
-      } else if (number === step) {
-        state = 'active';
-      }
+        if (number < step) {
+          state =
+            'completed';
+        } else if (number === step) {
+          state =
+            'active';
+        }
 
-      return `
-        <div class="progress-step ${state}">
-          <span>${item[0]}</span>
-          <label>${item[1]}</label>
-        </div>
-      `;
-    }).join('');
+        return `
+          <div class="progress-step ${state}">
+            <span>${item[0]}</span>
+            <label>${item[1]}</label>
+          </div>
+        `;
+      })
+      .join('');
 }
 
 
 // --------------------------------------------------
 // SUPABASE SESSION
+// --------------------------------------------------
+//
+// This remains for compatibility with the current
+// anonymous-session implementation.
+//
+// The permanent student identity should NOT depend
+// on this anonymous UID once the multi-device backend
+// is deployed.
 // --------------------------------------------------
 
 async function ensureSession() {
@@ -334,7 +485,10 @@ async function ensureSession() {
 // --------------------------------------------------
 
 async function activateStudent() {
-  if (!indexInput || !accessCodeInput) {
+  if (
+    !indexInput ||
+    !accessCodeInput
+  ) {
     showMessage(
       'Login form is unavailable.',
       'error'
@@ -349,7 +503,10 @@ async function activateStudent() {
   const accessCode =
     accessCodeInput.value.trim();
 
-  if (!studentId || !accessCode) {
+  if (
+    !studentId ||
+    !accessCode
+  ) {
     showMessage(
       'Enter your index number and access code.',
       'error'
@@ -369,6 +526,12 @@ async function activateStudent() {
   );
 
   try {
+    clearStudentLoggedOut();
+
+    /*
+     * Anonymous Supabase session is retained only
+     * for compatibility with the current backend.
+     */
     await ensureSession();
 
     const {
@@ -379,19 +542,53 @@ async function activateStudent() {
         'student-login',
         {
           body: {
-            student_id: studentId,
-            access_code: accessCode
+            student_id:
+              studentId,
+
+            access_code:
+              accessCode
           }
         }
       );
 
+    console.log(
+      'student-login response:',
+      {
+        data,
+        error
+      }
+    );
+
+    if (error) {
+      throw new Error(
+        error.message ||
+        'Unable to verify your login.'
+      );
+    }
+
     if (
-      error ||
-      !data?.success
+      !data?.success ||
+      !data?.student
     ) {
       throw new Error(
         data?.error ||
         'Invalid index number or access code.'
+      );
+    }
+
+    /*
+     * Multi-device support:
+     *
+     * The backend should return a token such as:
+     *
+     * data.session_token
+     *
+     * This token belongs to the student rather than
+     * the anonymous Supabase browser account.
+     */
+    if (data.session_token) {
+      setStudentSessionToken(
+        data.session_token
       );
     }
 
@@ -403,7 +600,8 @@ async function activateStudent() {
     );
 
     if (loginSection) {
-      loginSection.hidden = true;
+      loginSection.hidden =
+        true;
     }
 
     const alreadyAllocated =
@@ -445,8 +643,8 @@ async function loadStudentPhone() {
     data,
     error
   } =
-    await supabase.rpc(
-      'get_student_phone'
+    await invokeStudentFunction(
+      'get-student-phone'
     );
 
   if (error) {
@@ -486,10 +684,12 @@ async function saveStudentPhone() {
     data,
     error
   } =
-    await supabase.rpc(
-      'update_student_phone',
+    await invokeStudentFunction(
+      'update-student-phone',
       {
-        p_phone: phone
+        body: {
+          p_phone: phone
+        }
       }
     );
 
@@ -507,10 +707,12 @@ async function saveStudentPhone() {
 
   if (currentStudent) {
     currentStudent.phone_number =
-      data || phone;
+      data ||
+      phone;
   }
 
-  return data || phone;
+  return data ||
+    phone;
 }
 
 
@@ -526,8 +728,11 @@ async function showGenderSelection() {
   );
 
   if (genderMessage) {
-    genderMessage.className = '';
-    genderMessage.textContent = '';
+    genderMessage.className =
+      '';
+
+    genderMessage.textContent =
+      '';
   }
 
   if (!phoneNumberInput) {
@@ -547,7 +752,8 @@ async function showGenderSelection() {
       await loadStudentPhone();
 
     phoneNumberInput.value =
-      existingPhone || '';
+      existingPhone ||
+      '';
 
   } catch (error) {
     console.error(
@@ -584,11 +790,13 @@ async function showGenderSelection() {
     gender === 'FEMALE'
   ) {
     if (genderChoices) {
-      genderChoices.hidden = true;
+      genderChoices.hidden =
+        true;
     }
 
     if (savePhoneButton) {
-      savePhoneButton.hidden = false;
+      savePhoneButton.hidden =
+        false;
     }
 
     if (genderMessage) {
@@ -605,11 +813,13 @@ async function showGenderSelection() {
    */
 
   if (genderChoices) {
-    genderChoices.hidden = false;
+    genderChoices.hidden =
+      false;
   }
 
   if (savePhoneButton) {
-    savePhoneButton.hidden = true;
+    savePhoneButton.hidden =
+      true;
   }
 
   if (genderMessage) {
@@ -635,7 +845,8 @@ async function savePhoneAndContinue() {
   );
 
   if (genderMessage) {
-    genderMessage.className = '';
+    genderMessage.className =
+      '';
 
     genderMessage.textContent =
       'Saving your phone number securely...';
@@ -695,11 +906,13 @@ async function selectGender(gender) {
     );
 
   buttons.forEach(button => {
-    button.disabled = true;
+    button.disabled =
+      true;
   });
 
   if (genderMessage) {
-    genderMessage.className = '';
+    genderMessage.className =
+      '';
 
     genderMessage.textContent =
       'Saving your details securely...';
@@ -709,13 +922,11 @@ async function selectGender(gender) {
     /*
      * Phone number must be saved first.
      */
-
     await saveStudentPhone();
 
     /*
-     * Save gender through the existing RPC.
+     * Save gender through existing RPC.
      */
-
     const {
       data,
       error
@@ -723,7 +934,8 @@ async function selectGender(gender) {
       await supabase.rpc(
         'set_student_gender',
         {
-          p_gender: normalized
+          p_gender:
+            normalized
         }
       );
 
@@ -737,7 +949,6 @@ async function selectGender(gender) {
     /*
      * Update local student state.
      */
-
     if (currentStudent) {
       currentStudent.gender =
         data ||
@@ -772,7 +983,8 @@ async function selectGender(gender) {
     }
 
     buttons.forEach(button => {
-      button.disabled = false;
+      button.disabled =
+        false;
     });
   }
 }
@@ -786,7 +998,8 @@ function showBlockSelection() {
   updateProgress(3);
 
   if (blockMessage) {
-    blockMessage.textContent = '';
+    blockMessage.textContent =
+      '';
   }
 
   showSection(
@@ -804,7 +1017,9 @@ function selectBlock(block) {
   ];
 
   if (
-    !validBlocks.includes(block)
+    !validBlocks.includes(
+      block
+    )
   ) {
     return;
   }
@@ -812,7 +1027,9 @@ function selectBlock(block) {
   selectedBlock =
     block;
 
-  loadRooms(block);
+  loadRooms(
+    block
+  );
 }
 
 
@@ -866,7 +1083,7 @@ async function loadRooms(
       data,
       error
     } =
-      await supabase.functions.invoke(
+      await invokeStudentFunction(
         'rooms',
         {
           body: {
@@ -889,7 +1106,8 @@ async function loadRooms(
     }
 
     const rooms =
-      data?.rooms ?? [];
+      data?.rooms ??
+      [];
 
     if (!rooms.length) {
       grid.innerHTML = `
@@ -936,17 +1154,20 @@ async function loadRooms(
       rooms.map(room => {
         const availableBeds =
           Number(
-            room.available_beds ?? 0
+            room.available_beds ??
+            0
           );
 
         const occupiedBeds =
           Number(
-            room.occupied_beds ?? 0
+            room.occupied_beds ??
+            0
           );
 
         const capacity =
           Number(
-            room.capacity ?? 4
+            room.capacity ??
+            4
           );
 
         const roomGender =
@@ -983,11 +1204,12 @@ async function loadRooms(
          * Dome rooms 31–40 are permanently
          * male-only.
          */
-
         const isDomeMaleOnly =
           room.block === 'Dome' &&
           /^(3[1-9]|40)$/.test(
-            String(room.room_number)
+            String(
+              room.room_number
+            )
           );
 
         if (isDomeMaleOnly) {
@@ -1003,24 +1225,43 @@ async function loadRooms(
             ? Math.min(
                 100,
                 Math.round(
-                  (occupiedBeds / capacity) * 100
+                  (
+                    occupiedBeds /
+                    capacity
+                  ) * 100
                 )
               )
             : 0;
 
         const bedVisual =
           Array.from(
-            { length: capacity },
+            {
+              length:
+                capacity
+            },
             (_, index) => {
               const occupied =
-                index < occupiedBeds;
+                index <
+                occupiedBeds;
 
               return `
                 <span
-                  class="bed-indicator ${occupied ? 'occupied' : 'available'}"
-                  title="${occupied ? 'Occupied' : 'Available'}"
+                  class="bed-indicator ${
+                    occupied
+                      ? 'occupied'
+                      : 'available'
+                  }"
+                  title="${
+                    occupied
+                      ? 'Occupied'
+                      : 'Available'
+                  }"
                 >
-                  ${occupied ? '●' : '○'}
+                  ${
+                    occupied
+                      ? '●'
+                      : '○'
+                  }
                 </span>
               `;
             }
@@ -1034,35 +1275,45 @@ async function loadRooms(
             <div class="room-card-top">
 
               <span class="room-block-label">
-                ${escapeHtml(room.block)}
+                ${escapeHtml(
+                  room.block
+                )}
               </span>
 
               <span
                 class="gender-badge ${genderClass}"
               >
-                ${escapeHtml(genderLabel)}
+                ${escapeHtml(
+                  genderLabel
+                )}
               </span>
 
             </div>
-
 
             <div class="room-card-header">
 
               <div>
 
                 <h3>
-                  ${escapeHtml(room.room_code)}
+                  ${escapeHtml(
+                    room.room_code
+                  )}
                 </h3>
 
                 <p class="room-location">
-                  Floor ${escapeHtml(room.floor)}
-                  · Room ${escapeHtml(room.room_number)}
+                  Floor
+                  ${escapeHtml(
+                    room.floor
+                  )}
+                  · Room
+                  ${escapeHtml(
+                    room.room_number
+                  )}
                 </p>
 
               </div>
 
             </div>
-
 
             <div class="room-visual">
 
@@ -1076,7 +1327,6 @@ async function loadRooms(
 
             </div>
 
-
             <div class="room-capacity">
 
               <div>
@@ -1086,7 +1336,11 @@ async function loadRooms(
                 </strong>
 
                 <span>
-                  ${availableBeds === 1 ? 'bed' : 'beds'}
+                  ${
+                    availableBeds === 1
+                      ? 'bed'
+                      : 'beds'
+                  }
                   available
                 </span>
 
@@ -1099,7 +1353,6 @@ async function loadRooms(
 
             </div>
 
-
             <div class="occupancy-bar">
 
               <span
@@ -1108,17 +1361,26 @@ async function loadRooms(
 
             </div>
 
-
             <button
               type="button"
               class="select-room modern-select-room"
-              data-room-id="${escapeHtml(room.id)}"
-              ${availableBeds <= 0 ? 'disabled' : ''}
+              data-room-id="${escapeHtml(
+                room.id
+              )}"
+              ${
+                availableBeds <= 0
+                  ? 'disabled'
+                  : ''
+              }
             >
 
-              <span>Select this room</span>
+              <span>
+                Select this room
+              </span>
 
-              <span aria-hidden="true">→</span>
+              <span aria-hidden="true">
+                →
+              </span>
 
             </button>
 
@@ -1127,7 +1389,9 @@ async function loadRooms(
       }).join('');
 
     document
-      .querySelectorAll('.select-room')
+      .querySelectorAll(
+        '.select-room'
+      )
       .forEach(button => {
         button.addEventListener(
           'click',
@@ -1151,7 +1415,9 @@ async function loadRooms(
           !
         </div>
 
-        <h3>Unable to load rooms</h3>
+        <h3>
+          Unable to load rooms
+        </h3>
 
         <p>
           ${escapeHtml(
@@ -1179,7 +1445,10 @@ async function loadRooms(
     if (retryButton) {
       retryButton.addEventListener(
         'click',
-        () => loadRooms(block)
+        () =>
+          loadRooms(
+            block
+          )
       );
     }
   }
@@ -1207,22 +1476,32 @@ async function holdRoom(roomId) {
     return;
   }
 
-  disableButtons('.select-room', true);
+  disableButtons(
+    '.select-room',
+    true
+  );
 
-  let holdData = null;
+  let holdData =
+    null;
 
-  // -----------------------------------------------
-  // 1. CREATE THE HOLD
-  // -----------------------------------------------
+  /*
+   * CREATE THE HOLD
+   */
 
   try {
-    const { data, error } =
-      await supabase.functions.invoke(
+    const {
+      data,
+      error
+    } =
+      await invokeStudentFunction(
         'allocate-room',
         {
           body: {
-            action: 'hold',
-            room_id: roomId
+            action:
+              'hold',
+
+            room_id:
+              roomId
           }
         }
       );
@@ -1257,7 +1536,9 @@ async function holdRoom(roomId) {
       throw new Error(
         typeof data.error === 'string'
           ? data.error
-          : JSON.stringify(data.error)
+          : JSON.stringify(
+              data.error
+            )
       );
     }
 
@@ -1296,9 +1577,9 @@ async function holdRoom(roomId) {
     return;
   }
 
-  // -----------------------------------------------
-  // 2. DISPLAY THE HOLD SCREEN
-  // -----------------------------------------------
+  /*
+   * DISPLAY HOLD SCREEN
+   */
 
   try {
     console.log(
@@ -1327,8 +1608,9 @@ async function holdRoom(roomId) {
 // HOLD SCREEN
 // --------------------------------------------------
 
-function showHoldConfirmation(hold) {
-
+function showHoldConfirmation(
+  hold
+) {
   if (!allocationSection) {
     console.error(
       'allocationSection was not found in the DOM.'
@@ -1356,7 +1638,6 @@ function showHoldConfirmation(hold) {
 
       </div>
 
-
       <div class="reservation-heading">
 
         <span class="eyebrow">
@@ -1374,19 +1655,21 @@ function showHoldConfirmation(hold) {
 
       </div>
 
-
       <div class="reservation-room">
 
         <div class="reservation-room-code">
-          ${escapeHtml(hold.room_code)}
+          ${escapeHtml(
+            hold.room_code
+          )}
         </div>
 
         <div class="reservation-bed">
-          Bed ${escapeHtml(hold.bed_number)}
+          Bed ${escapeHtml(
+            hold.bed_number
+          )}
         </div>
 
       </div>
-
 
       <div class="reservation-warning">
 
@@ -1409,7 +1692,6 @@ function showHoldConfirmation(hold) {
 
       </div>
 
-
       <div class="countdown-panel">
 
         <span>
@@ -1425,7 +1707,6 @@ function showHoldConfirmation(hold) {
 
       </div>
 
-
       <div class="reservation-actions">
 
         <button
@@ -1433,7 +1714,6 @@ function showHoldConfirmation(hold) {
           id="confirmAllocation"
           class="primary-action"
         >
-
           Confirm room
 
           <span aria-hidden="true">
@@ -1442,19 +1722,15 @@ function showHoldConfirmation(hold) {
 
         </button>
 
-
         <button
           type="button"
           id="cancelHoldView"
           class="secondary-button"
         >
-
           Return to rooms
-
         </button>
 
       </div>
-
 
       <p
         id="holdMessage"
@@ -1463,7 +1739,6 @@ function showHoldConfirmation(hold) {
 
     </div>
   `;
-
 
   const confirmButton =
     document.getElementById(
@@ -1480,7 +1755,6 @@ function showHoldConfirmation(hold) {
     );
   }
 
-
   const cancelButton =
     document.getElementById(
       'cancelHoldView'
@@ -1491,6 +1765,9 @@ function showHoldConfirmation(hold) {
       'click',
       () => {
         stopHoldTimer();
+
+        currentHold =
+          null;
 
         if (allocationSection) {
           allocationSection.hidden =
@@ -1503,7 +1780,6 @@ function showHoldConfirmation(hold) {
       }
     );
   }
-
 
   startHoldCountdown(
     hold
@@ -1527,7 +1803,9 @@ function stopHoldTimer() {
 }
 
 
-function startHoldCountdown(hold) {
+function startHoldCountdown(
+  hold
+) {
   stopHoldTimer();
 
   const countdown =
@@ -1560,9 +1838,13 @@ function startHoldCountdown(hold) {
 
       stopHoldTimer();
 
+      currentHold =
+        null;
+
       if (holdMessage) {
         holdMessage.textContent =
           'Your reservation has expired. Please choose another room.';
+
         holdMessage.className =
           'hold-message error';
       }
@@ -1617,7 +1899,9 @@ function startHoldCountdown(hold) {
 // CONFIRM ALLOCATION
 // --------------------------------------------------
 
-async function confirmAllocation(holdId) {
+async function confirmAllocation(
+  holdId
+) {
   if (!holdId) {
     return;
   }
@@ -1651,12 +1935,15 @@ async function confirmAllocation(holdId) {
       data,
       error
     } =
-      await supabase.functions.invoke(
+      await invokeStudentFunction(
         'allocate-room',
         {
           body: {
-            action: 'confirm',
-            hold_id: holdId
+            action:
+              'confirm',
+
+            hold_id:
+              holdId
           }
         }
       );
@@ -1668,6 +1955,12 @@ async function confirmAllocation(holdId) {
         error
       }
     );
+
+    /*
+     * IMPORTANT:
+     * Check errors BEFORE treating the operation
+     * as successful.
+     */
 
     if (error) {
       throw new Error(
@@ -1686,22 +1979,38 @@ async function confirmAllocation(holdId) {
       throw new Error(
         typeof data.error === 'string'
           ? data.error
-          : JSON.stringify(data.error)
+          : JSON.stringify(
+              data.error
+            )
       );
     }
+
+    /*
+     * Confirmation succeeded.
+     */
 
     stopHoldTimer();
 
     currentHold =
       null;
 
-    showAllocationReceipt(
-      data
-    );
+    /*
+     * Refresh the authoritative allocation
+     * directly from the backend.
+     */
+
+    const portalLoaded =
+      await loadStudentPortal();
+
+    if (!portalLoaded) {
+      showAllocationReceipt(
+        data
+      );
+    }
 
   } catch (error) {
     console.error(
-      'Allocation confirmation error:',
+      'Allocation confirmation failed:',
       error
     );
 
@@ -1710,7 +2019,7 @@ async function confirmAllocation(holdId) {
         'hold-message error';
 
       holdMessage.textContent =
-        error.message ||
+        error?.message ||
         'Unable to confirm your allocation.';
     }
 
@@ -1729,13 +2038,13 @@ async function confirmAllocation(holdId) {
 function showAllocationReceipt(
   data
 ) {
-  showSection(
-    allocationSection
-  );
-
   if (!allocationSection) {
     return;
   }
+
+  showSection(
+    allocationSection
+  );
 
   allocationSection.innerHTML = `
     <div class="allocation-success">
@@ -1744,25 +2053,19 @@ function showAllocationReceipt(
         ✓
       </div>
 
-
       <span class="eyebrow">
         UHAS ASOGLI HALL
       </span>
-
 
       <h2>
         Allocation confirmed
       </h2>
 
-
       <p class="success-lead">
-
         Your accommodation has been successfully
         allocated. Please keep this information
         for your records.
-
       </p>
-
 
       <div class="allocation-ticket">
 
@@ -1788,7 +2091,6 @@ function showAllocationReceipt(
 
         </div>
 
-
         <div class="ticket-student">
 
           <span>
@@ -1797,17 +2099,17 @@ function showAllocationReceipt(
 
           <strong>
             ${escapeHtml(
-              data.student_name
+              data.student_name ||
+              currentStudent?.student_name ||
+              ''
             )}
           </strong>
 
         </div>
 
-
         <div class="ticket-grid">
 
           <div>
-
             <span>
               BLOCK
             </span>
@@ -1817,12 +2119,9 @@ function showAllocationReceipt(
                 data.block
               )}
             </strong>
-
           </div>
 
-
           <div>
-
             <span>
               ROOM
             </span>
@@ -1832,12 +2131,9 @@ function showAllocationReceipt(
                 data.room_number
               )}
             </strong>
-
           </div>
 
-
           <div>
-
             <span>
               BED
             </span>
@@ -1847,12 +2143,9 @@ function showAllocationReceipt(
                 data.bed_number
               )}
             </strong>
-
           </div>
 
-
           <div>
-
             <span>
               ROOM CODE
             </span>
@@ -1862,13 +2155,11 @@ function showAllocationReceipt(
                 data.room_code
               )}
             </strong>
-
           </div>
 
         </div>
 
       </div>
-
 
       <div class="success-note">
 
@@ -1877,38 +2168,44 @@ function showAllocationReceipt(
         </span>
 
         <p>
-
           Your allocation is now recorded in the
           UHAS Asogli Hall accommodation system.
-
         </p>
 
       </div>
 
+      <div class="reservation-actions">
 
-      <button
-        type="button"
-        class="primary-action"
-        id="printAllocation"
-      >
+        <button
+          type="button"
+          class="primary-action"
+          id="openStudentPortal"
+        >
+          Open student portal
 
-        Print / Save allocation
+          <span aria-hidden="true">
+            →
+          </span>
 
-        <span aria-hidden="true">
-          ↗
-        </span>
+        </button>
 
-      </button>
+        <button
+          type="button"
+          class="secondary-button"
+          id="printAllocation"
+        >
+          Print / Save allocation
+        </button>
+
+      </div>
 
     </div>
   `;
-
 
   if (roomsSection) {
     roomsSection.hidden =
       true;
   }
-
 
   const printButton =
     document.getElementById(
@@ -1918,31 +2215,97 @@ function showAllocationReceipt(
   if (printButton) {
     printButton.addEventListener(
       'click',
-      () => window.print()
+      () =>
+        window.print()
+    );
+  }
+
+  const portalButton =
+    document.getElementById(
+      'openStudentPortal'
+    );
+
+  if (portalButton) {
+    portalButton.addEventListener(
+      'click',
+      async () => {
+        const loaded =
+          await loadStudentPortal();
+
+        if (!loaded) {
+          showMessage(
+            'Your allocation was confirmed, but the student portal could not be loaded. Please refresh the page.',
+            'error'
+          );
+        }
+      }
     );
   }
 }
 
 
 // --------------------------------------------------
-// EXISTING ALLOCATION
+// STUDENT PORTAL
 // --------------------------------------------------
 
-async function loadExistingAllocation() {
+async function loadStudentPortal() {
   try {
     const {
       data,
       error
     } =
-      await supabase.functions.invoke(
+      await invokeStudentFunction(
         'my-allocation'
       );
 
-    if (
-      error ||
-      !data?.allocation
-    ) {
+    if (error) {
+      console.error(
+        'my-allocation error:',
+        error
+      );
+
       return false;
+    }
+
+    if (!data?.student) {
+      return false;
+    }
+
+    currentStudent =
+      data.student;
+
+    currentPortalData =
+      data;
+
+    if (!data.allocation) {
+      currentAllocation =
+        null;
+
+      return false;
+    }
+
+    currentAllocation =
+      data.allocation;
+
+    /*
+     * The backend returns roommates separately:
+     *
+     * {
+     *   student,
+     *   allocation,
+     *   roommates
+     * }
+     *
+     * Keep the data together for portal rendering.
+     */
+
+    if (
+      !Array.isArray(
+        currentPortalData.roommates
+      )
+    ) {
+      currentPortalData.roommates =
+        [];
     }
 
     if (loginSection) {
@@ -1965,172 +2328,867 @@ async function loadExistingAllocation() {
         true;
     }
 
-    if (allocationSection) {
-      allocationSection.hidden =
-        false;
-    }
+    portalTab =
+      'room';
 
-    const allocation =
-      data.allocation;
+    renderStudentPortal();
 
-    const bed =
-      allocation.beds;
+    return true;
 
-    const room =
-      bed?.rooms;
+  } catch (error) {
+    console.error(
+      'Student portal loading failed:',
+      error
+    );
+
+    return false;
+  }
+}
 
 
-    allocationSection.innerHTML = `
-      <div class="allocation-success">
+// --------------------------------------------------
+// PORTAL RENDERING
+// --------------------------------------------------
 
-        <div class="success-mark">
-          ✓
+function renderStudentPortal() {
+  if (!allocationSection) {
+    return;
+  }
+
+  stopHoldTimer();
+
+  showSection(
+    allocationSection
+  );
+
+  allocationSection.innerHTML = `
+    <div class="student-portal">
+
+      <header class="student-portal-header">
+
+        <div>
+
+          <span class="eyebrow">
+            UHAS ASOGLI HALL
+          </span>
+
+          <h2>
+            Student Accommodation Portal
+          </h2>
+
+          <p>
+            Welcome,
+            ${escapeHtml(
+              currentStudent?.student_name ||
+              ''
+            )}.
+          </p>
+
         </div>
 
+        <button
+          type="button"
+          id="studentLogout"
+          class="secondary-button portal-logout"
+        >
+          Logout
+        </button>
+
+      </header>
+
+      <nav
+        class="student-portal-nav"
+        aria-label="Student accommodation navigation"
+      >
+
+        <button
+          type="button"
+          class="portal-tab ${
+            portalTab === 'room'
+              ? 'active'
+              : ''
+          }"
+          data-portal-tab="room"
+        >
+          My Room
+        </button>
+
+        <button
+          type="button"
+          class="portal-tab ${
+            portalTab === 'roommates'
+              ? 'active'
+              : ''
+          }"
+          data-portal-tab="roommates"
+        >
+          Roommates
+        </button>
+
+        <button
+          type="button"
+          class="portal-tab ${
+            portalTab === 'details'
+              ? 'active'
+              : ''
+          }"
+          data-portal-tab="details"
+        >
+          Allocation Details
+        </button>
+
+      </nav>
+
+      <main
+        class="student-portal-content"
+        id="studentPortalContent"
+      >
+        ${renderPortalTab()}
+      </main>
+
+    </div>
+  `;
+
+  document
+    .querySelectorAll(
+      '[data-portal-tab]'
+    )
+    .forEach(button => {
+      button.addEventListener(
+        'click',
+        () => {
+          portalTab =
+            button.dataset.portalTab;
+
+          renderStudentPortal();
+        }
+      );
+    });
+
+  const logoutButton =
+    document.getElementById(
+      'studentLogout'
+    );
+
+  if (logoutButton) {
+    logoutButton.addEventListener(
+      'click',
+      logoutStudent
+    );
+  }
+
+  const printButton =
+    document.getElementById(
+      'printStudentAllocation'
+    );
+
+  if (printButton) {
+    printButton.addEventListener(
+      'click',
+      () =>
+        window.print()
+    );
+  }
+}
+
+
+// --------------------------------------------------
+// PORTAL TAB CONTENT
+// --------------------------------------------------
+
+function renderPortalTab() {
+  if (
+    portalTab === 'roommates'
+  ) {
+    return renderRoommatesTab();
+  }
+
+  if (
+    portalTab === 'details'
+  ) {
+    return renderAllocationDetailsTab();
+  }
+
+  return renderMyRoomTab();
+}
+
+
+// --------------------------------------------------
+// MY ROOM
+// --------------------------------------------------
+
+function renderMyRoomTab() {
+  const allocation =
+    currentAllocation;
+
+  const bed =
+    allocation?.beds;
+
+  const room =
+    bed?.rooms;
+
+  return `
+    <section class="portal-panel">
+
+      <div class="portal-panel-heading">
 
         <span class="eyebrow">
-          UHAS ASOGLI HALL
+          YOUR ACCOMMODATION
         </span>
 
+        <h3>
+          My Room
+        </h3>
 
-        <h2>
-          Your allocation
-        </h2>
-
-
-        <p class="success-lead">
-
-          You already have a confirmed accommodation
-          allocation.
-
+        <p>
+          Your currently assigned room and bed.
         </p>
 
+      </div>
 
-        <div class="allocation-ticket">
+      <div class="my-room-card">
 
-          <div class="ticket-header">
+        <div class="my-room-primary">
 
-            <div>
+          <span class="room-label">
+            ROOM
+          </span>
 
-              <span>
-                ALLOCATION NUMBER
-              </span>
+          <strong class="portal-room-code">
+            ${escapeHtml(
+              room?.room_code ||
+              '—'
+            )}
+          </strong>
 
-              <strong>
-                ${escapeHtml(
-                  allocation.allocation_number
-                )}
-              </strong>
+          <span class="room-location">
+            ${escapeHtml(
+              room?.block ||
+              ''
+            )}
+            · Floor
+            ${escapeHtml(
+              room?.floor ??
+              '—'
+            )}
+            · Room
+            ${escapeHtml(
+              room?.room_number ??
+              '—'
+            )}
+          </span>
 
-            </div>
+        </div>
 
-            <span class="ticket-confirmed">
-              CONFIRMED
-            </span>
+        <div class="my-room-bed">
 
+          <span class="room-label">
+            ASSIGNED BED
+          </span>
+
+          <strong>
+            Bed
+            ${escapeHtml(
+              bed?.bed_number ??
+              '—'
+            )}
+          </strong>
+
+        </div>
+
+      </div>
+
+      <div class="portal-info-grid">
+
+        <div class="portal-info-card">
+
+          <span>
+            BLOCK
+          </span>
+
+          <strong>
+            ${escapeHtml(
+              room?.block ||
+              '—'
+            )}
+          </strong>
+
+        </div>
+
+        <div class="portal-info-card">
+
+          <span>
+            ROOM
+          </span>
+
+          <strong>
+            ${escapeHtml(
+              room?.room_number ??
+              '—'
+            )}
+          </strong>
+
+        </div>
+
+        <div class="portal-info-card">
+
+          <span>
+            FLOOR
+          </span>
+
+          <strong>
+            ${escapeHtml(
+              room?.floor ??
+              '—'
+            )}
+          </strong>
+
+        </div>
+
+        <div class="portal-info-card">
+
+          <span>
+            BED
+          </span>
+
+          <strong>
+            ${escapeHtml(
+              bed?.bed_number ??
+              '—'
+            )}
+          </strong>
+
+        </div>
+
+      </div>
+
+    </section>
+  `;
+}
+
+
+// --------------------------------------------------
+// ROOMMATES
+// --------------------------------------------------
+
+function renderRoommatesTab() {
+  /*
+   * IMPORTANT:
+   * roommates come from my-allocation as:
+   *
+   * data.roommates
+   *
+   * NOT currentAllocation.roommates.
+   */
+
+  const roommates =
+    Array.isArray(
+      currentPortalData?.roommates
+    )
+      ? currentPortalData.roommates
+      : [];
+
+  if (!roommates.length) {
+    return `
+      <section class="portal-panel">
+
+        <div class="portal-panel-heading">
+
+          <span class="eyebrow">
+            YOUR ROOM
+          </span>
+
+          <h3>
+            Roommates
+          </h3>
+
+          <p>
+            Other students assigned to your room.
+          </p>
+
+        </div>
+
+        <div class="portal-empty-state">
+
+          <div class="empty-icon">
+            ◉
           </div>
 
+          <h4>
+            No other roommates found
+          </h4>
 
-          <div class="ticket-student">
+          <p>
+            There are currently no other allocated
+            students returned for this room.
+          </p>
+
+        </div>
+
+      </section>
+    `;
+  }
+
+  return `
+    <section class="portal-panel">
+
+      <div class="portal-panel-heading">
+
+        <span class="eyebrow">
+          YOUR ROOM
+        </span>
+
+        <h3>
+          Roommates
+        </h3>
+
+        <p>
+          ${roommates.length}
+          ${
+            roommates.length === 1
+              ? 'other student'
+              : 'other students'
+          }
+          currently assigned to your room.
+        </p>
+
+      </div>
+
+      <div class="roommate-list">
+
+        ${roommates
+          .map(roommate => `
+            <article class="roommate-card">
+
+              <div class="roommate-avatar">
+                ${escapeHtml(
+                  String(
+                    roommate?.student_name ||
+                    '?'
+                  )
+                    .trim()
+                    .charAt(0)
+                    .toUpperCase()
+                )}
+              </div>
+
+              <div class="roommate-details">
+
+                <strong>
+                  ${escapeHtml(
+                    roommate?.student_name ||
+                    'Student'
+                  )}
+                </strong>
+
+                <span>
+                  ${escapeHtml(
+                    roommate?.programme ||
+                    'Programme not available'
+                  )}
+                </span>
+
+                <span>
+                  Level
+                  ${escapeHtml(
+                    roommate?.level ??
+                    '—'
+                  )}
+                </span>
+
+              </div>
+
+            </article>
+          `)
+          .join('')}
+
+      </div>
+
+    </section>
+  `;
+}
+
+
+// --------------------------------------------------
+// ALLOCATION DETAILS
+// --------------------------------------------------
+
+function renderAllocationDetailsTab() {
+  const allocation =
+    currentAllocation;
+
+  const bed =
+    allocation?.beds;
+
+  const room =
+    bed?.rooms;
+
+  const createdAt =
+    allocation?.created_at
+      ? new Date(
+          allocation.created_at
+        ).toLocaleString()
+      : '—';
+
+  return `
+    <section class="portal-panel">
+
+      <div class="portal-panel-heading">
+
+        <span class="eyebrow">
+          CONFIRMED ALLOCATION
+        </span>
+
+        <h3>
+          Allocation Details
+        </h3>
+
+        <p>
+          Your official accommodation assignment.
+        </p>
+
+      </div>
+
+      <div class="allocation-ticket portal-ticket">
+
+        <div class="ticket-header">
+
+          <div>
 
             <span>
-              STUDENT
+              ALLOCATION NUMBER
             </span>
 
             <strong>
               ${escapeHtml(
-                currentStudent?.student_name ||
-                ''
+                allocation?.allocation_number ||
+                '—'
               )}
             </strong>
 
           </div>
 
+          <span class="ticket-confirmed">
+            ${escapeHtml(
+              allocation?.status ||
+              'CONFIRMED'
+            ).toUpperCase()}
+          </span>
 
-          <div class="ticket-grid">
+        </div>
 
-            <div>
+        <div class="ticket-student">
 
-              <span>
-                BLOCK
-              </span>
+          <span>
+            STUDENT
+          </span>
 
-              <strong>
-                ${escapeHtml(
-                  room?.block
-                )}
-              </strong>
+          <strong>
+            ${escapeHtml(
+              currentStudent?.student_name ||
+              '—'
+            )}
+          </strong>
 
-            </div>
+        </div>
 
+        <div class="ticket-grid">
 
-            <div>
+          <div>
 
-              <span>
-                ROOM
-              </span>
+            <span>
+              BLOCK
+            </span>
 
-              <strong>
-                ${escapeHtml(
-                  room?.room_number
-                )}
-              </strong>
+            <strong>
+              ${escapeHtml(
+                room?.block ||
+                '—'
+              )}
+            </strong>
 
-            </div>
+          </div>
 
+          <div>
 
-            <div>
+            <span>
+              ROOM
+            </span>
 
-              <span>
-                BED
-              </span>
+            <strong>
+              ${escapeHtml(
+                room?.room_number ??
+                '—'
+              )}
+            </strong>
 
-              <strong>
-                ${escapeHtml(
-                  bed?.bed_number
-                )}
-              </strong>
+          </div>
 
-            </div>
+          <div>
 
+            <span>
+              BED
+            </span>
 
-            <div>
+            <strong>
+              ${escapeHtml(
+                bed?.bed_number ??
+                '—'
+              )}
+            </strong>
 
-              <span>
-                ROOM CODE
-              </span>
+          </div>
 
-              <strong>
-                ${escapeHtml(
-                  room?.room_code
-                )}
-              </strong>
+          <div>
 
-            </div>
+            <span>
+              ROOM CODE
+            </span>
+
+            <strong>
+              ${escapeHtml(
+                room?.room_code ||
+                '—'
+              )}
+            </strong>
 
           </div>
 
         </div>
 
-
-        <div class="success-note">
+        <div class="allocation-created">
 
           <span>
-            ✓
+            ALLOCATION DATE
           </span>
 
-          <p>
-
-            This allocation is already confirmed
-            and cannot be booked again.
-
-          </p>
+          <strong>
+            ${escapeHtml(
+              createdAt
+            )}
+          </strong>
 
         </div>
 
       </div>
-    `;
 
+      <div class="success-note">
+
+        <span>
+          ✓
+        </span>
+
+        <p>
+          Your accommodation allocation is confirmed
+          and cannot be used to book another room.
+        </p>
+
+      </div>
+
+      <button
+        type="button"
+        class="primary-action"
+        id="printStudentAllocation"
+      >
+        Print / Save allocation
+
+        <span aria-hidden="true">
+          ↗
+        </span>
+
+      </button>
+
+    </section>
+  `;
+}
+
+
+// --------------------------------------------------
+// STUDENT LOGOUT
+// --------------------------------------------------
+
+async function logoutStudent() {
+  const confirmed =
+    window.confirm(
+      'Are you sure you want to log out of your accommodation portal?'
+    );
+
+  if (!confirmed) {
+    return;
+  }
+
+  stopHoldTimer();
+
+  currentStudent =
+    null;
+
+  currentAllocation =
+    null;
+
+  currentPortalData =
+    null;
+
+  currentHold =
+    null;
+
+  selectedBlock =
+    null;
+
+  portalTab =
+    'room';
+
+  /*
+   * Remove this browser's student session.
+   *
+   * This does NOT affect the student's ability
+   * to log in on another device.
+   */
+
+  clearStudentSessionToken();
+
+  /*
+   * Remember that this browser was explicitly
+   * logged out so startup doesn't immediately
+   * restore a portal.
+   */
+
+  markStudentLoggedOut();
+
+  if (allocationSection) {
+    allocationSection.innerHTML =
+      '';
+
+    allocationSection.hidden =
+      true;
+  }
+
+  if (genderSection) {
+    genderSection.hidden =
+      true;
+  }
+
+  if (blockSection) {
+    blockSection.hidden =
+      true;
+  }
+
+  if (roomsSection) {
+    roomsSection.hidden =
+      true;
+  }
+
+  if (loginSection) {
+    loginSection.hidden =
+      false;
+  }
+
+  if (indexInput) {
+    indexInput.value =
+      '';
+  }
+
+  if (accessCodeInput) {
+    accessCodeInput.value =
+      '';
+  }
+
+  if (phoneNumberInput) {
+    phoneNumberInput.value =
+      '';
+  }
+
+  showMessage(
+    'You have been logged out. Enter your index number and access code to continue.'
+  );
+
+  updateProgress(1);
+
+  window.scrollTo({
+    top: 0,
+    behavior: 'smooth'
+  });
+}
+
+
+// --------------------------------------------------
+// EXISTING ALLOCATION
+// --------------------------------------------------
+
+async function loadExistingAllocation() {
+  try {
+    const {
+      data,
+      error
+    } =
+      await invokeStudentFunction(
+        'my-allocation'
+      );
+
+    if (error) {
+      console.error(
+        'Existing allocation check failed:',
+        error
+      );
+
+      return false;
+    }
+
+    if (!data?.student) {
+      return false;
+    }
+
+    /*
+     * my-allocation returns the authenticated
+     * student.
+     */
+
+    currentStudent =
+      data.student;
+
+    currentPortalData =
+      data;
+
+    if (!Array.isArray(
+      currentPortalData.roommates
+    )) {
+      currentPortalData.roommates =
+        [];
+    }
+
+    if (!data.allocation) {
+      currentAllocation =
+        null;
+
+      return false;
+    }
+
+    currentAllocation =
+      data.allocation;
+
+    if (loginSection) {
+      loginSection.hidden =
+        true;
+    }
+
+    if (genderSection) {
+      genderSection.hidden =
+        true;
+    }
+
+    if (blockSection) {
+      blockSection.hidden =
+        true;
+    }
+
+    if (roomsSection) {
+      roomsSection.hidden =
+        true;
+    }
+
+    portalTab =
+      'room';
+
+    renderStudentPortal();
 
     return true;
 
@@ -2206,7 +3264,9 @@ if (savePhoneButton) {
 
 
 document
-  .querySelectorAll('.gender-choice')
+  .querySelectorAll(
+    '.gender-choice'
+  )
   .forEach(button => {
     button.addEventListener(
       'click',
@@ -2219,7 +3279,9 @@ document
 
 
 document
-  .querySelectorAll('.block-choice')
+  .querySelectorAll(
+    '.block-choice'
+  )
   .forEach(button => {
     button.addEventListener(
       'click',
@@ -2243,6 +3305,57 @@ document
 
     updateProgress(1);
 
+    /*
+     * If the student explicitly logged out,
+     * never automatically reopen their portal.
+     */
+
+    if (
+      wasStudentLoggedOut()
+    ) {
+      clearStudentSessionToken();
+
+      if (loginSection) {
+        loginSection.hidden =
+          false;
+      }
+
+      return;
+    }
+
+    /*
+     * First preference:
+     * restore our student session.
+     */
+
+    const studentToken =
+      getStudentSessionToken();
+
+    if (studentToken) {
+      const existingAllocation =
+        await loadExistingAllocation();
+
+      if (existingAllocation) {
+        return;
+      }
+
+      /*
+       * If the token exists but no allocation
+       * was returned, don't leave the user
+       * trapped in a broken session.
+       */
+
+      clearStudentSessionToken();
+    }
+
+    /*
+     * Compatibility fallback for the current
+     * anonymous-auth implementation.
+     *
+     * Once multi-device student sessions are
+     * fully deployed, this fallback can be removed.
+     */
+
     const {
       data: {
         session
@@ -2254,18 +3367,14 @@ document
       const existingAllocation =
         await loadExistingAllocation();
 
-      if (!existingAllocation) {
-        if (loginSection) {
-          loginSection.hidden =
-            false;
-        }
+      if (existingAllocation) {
+        return;
       }
+    }
 
-    } else {
-      if (loginSection) {
-        loginSection.hidden =
-          false;
-      }
+    if (loginSection) {
+      loginSection.hidden =
+        false;
     }
 
   } catch (error) {

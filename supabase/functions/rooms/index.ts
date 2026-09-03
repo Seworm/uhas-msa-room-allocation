@@ -8,7 +8,12 @@ const corsHeaders = {
   'Content-Type': 'application/json',
 };
 
-const VALID_BLOCKS = ['Ahoe', 'Bankoe', 'Dome', 'Hliha'];
+const VALID_BLOCKS = [
+  'Ahoe',
+  'Bankoe',
+  'Dome',
+  'Hliha',
+];
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -30,7 +35,8 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const authorization = req.headers.get('Authorization');
+    const authorization =
+      req.headers.get('Authorization');
 
     if (!authorization) {
       return new Response(
@@ -56,7 +62,10 @@ Deno.serve(async (req) => {
       }
     );
 
-    // Verify the JWT/session.
+    // ------------------------------------------------------------
+    // 1. Verify the authenticated session
+    // ------------------------------------------------------------
+
     const {
       data: { user },
       error: authError,
@@ -74,8 +83,10 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Confirm that this authenticated account is linked
-    // to an eligible student.
+    // ------------------------------------------------------------
+    // 2. Verify that this account belongs to an eligible student
+    // ------------------------------------------------------------
+
     const {
       data: student,
       error: studentError,
@@ -88,11 +99,15 @@ Deno.serve(async (req) => {
       .maybeSingle();
 
     if (studentError) {
-      console.error('Student lookup failed:', studentError);
+      console.error(
+        'Student lookup failed:',
+        studentError
+      );
 
       return new Response(
         JSON.stringify({
-          error: 'Unable to verify student account',
+          error:
+            'Unable to verify student account',
         }),
         {
           status: 500,
@@ -117,7 +132,8 @@ Deno.serve(async (req) => {
     if (!student.eligible) {
       return new Response(
         JSON.stringify({
-          error: 'Student is not eligible for room allocation',
+          error:
+            'Student is not eligible for room allocation',
         }),
         {
           status: 403,
@@ -126,7 +142,10 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Gender must be selected before rooms can be displayed.
+    // ------------------------------------------------------------
+    // 3. Verify gender
+    // ------------------------------------------------------------
+
     const studentGender = String(
       student.gender ?? ''
     )
@@ -139,7 +158,8 @@ Deno.serve(async (req) => {
     ) {
       return new Response(
         JSON.stringify({
-          error: 'Please select your gender before viewing rooms',
+          error:
+            'Please select your gender before viewing rooms',
           code: 'GENDER_REQUIRED',
         }),
         {
@@ -149,7 +169,10 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Read the selected block from the request body.
+    // ------------------------------------------------------------
+    // 4. Read selected block
+    // ------------------------------------------------------------
+
     let body: { block?: string } = {};
 
     try {
@@ -158,7 +181,9 @@ Deno.serve(async (req) => {
       body = {};
     }
 
-    const block = String(body.block ?? '').trim();
+    const block = String(
+      body.block ?? ''
+    ).trim();
 
     if (!VALID_BLOCKS.includes(block)) {
       return new Response(
@@ -174,23 +199,23 @@ Deno.serve(async (req) => {
       );
     }
 
-    /*
-     * IMPORTANT:
-     *
-     * Do NOT query rooms directly here.
-     *
-     * available_rooms_for_current_student() is the database
-     * authority for room availability. It enforces:
-     *
-     * - student's selected gender
-     * - dynamic room gender
-     * - male 92-room maximum
-     * - female 68-room maximum
-     * - Dome 31–40 male-only rule
-     * - Ahoe temporary locks
-     * - Ahoe unlocking after all other rooms are completely full
-     * - available beds
-     */
+    // ------------------------------------------------------------
+    // 5. Ask the database for available rooms
+    //
+    // This function is deliberately NOT querying the rooms table
+    // directly.
+    //
+    // The database function is the authority for:
+    //
+    // - student gender
+    // - room gender
+    // - male/female room quotas
+    // - Dome 31–40 male-only rule
+    // - Ahoe temporary locks
+    // - Ahoe unlocking rules
+    // - available beds
+    // ------------------------------------------------------------
+
     const {
       data: rooms,
       error: roomsError,
@@ -209,7 +234,8 @@ Deno.serve(async (req) => {
 
       return new Response(
         JSON.stringify({
-          error: 'Unable to load available rooms',
+          error:
+            'Unable to load available rooms',
         }),
         {
           status: 500,
@@ -218,28 +244,51 @@ Deno.serve(async (req) => {
       );
     }
 
-    /*
-     * Normalize the database result for the frontend.
-     *
-     * The database function remains the source of truth.
-     * This only shapes its output for the web application.
-     */
+    // ------------------------------------------------------------
+    // 6. Normalize database response
+    // ------------------------------------------------------------
+
     const normalizedRooms = (rooms ?? [])
       .map((room: any) => ({
-        id: room.id ?? room.room_id,
-        room_code: room.room_code,
-        block: room.block,
-        floor: room.floor,
-        room_number: room.room_number,
-        capacity: room.capacity,
-        room_type: room.room_type,
-        gender: room.gender,
+        id:
+          room.id ??
+          room.room_id ??
+          null,
+
+        room_code:
+          room.room_code ??
+          null,
+
+        block:
+          room.block ??
+          null,
+
+        floor:
+          room.floor ??
+          null,
+
+        room_number:
+          room.room_number ??
+          null,
+
+        capacity:
+          Number(room.capacity ?? 0),
+
+        room_type:
+          room.room_type ??
+          null,
+
+        gender:
+          room.gender ??
+          null,
+
         available_beds:
           Number(
             room.available_beds ??
               room.available_bed_count ??
               0
           ),
+
         occupied_beds:
           Number(
             room.occupied_beds ??
@@ -253,6 +302,10 @@ Deno.serve(async (req) => {
           room.available_beds > 0
       );
 
+    // ------------------------------------------------------------
+    // 7. Return room data
+    // ------------------------------------------------------------
+
     return new Response(
       JSON.stringify({
         rooms: normalizedRooms,
@@ -265,11 +318,15 @@ Deno.serve(async (req) => {
       }
     );
   } catch (error) {
-    console.error('Rooms function error:', error);
+    console.error(
+      'Rooms function error:',
+      error
+    );
 
     return new Response(
       JSON.stringify({
-        error: 'Unable to load available rooms',
+        error:
+          'Unable to load available rooms',
       }),
       {
         status: 500,
