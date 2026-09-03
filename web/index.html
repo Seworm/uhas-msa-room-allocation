@@ -108,58 +108,119 @@
          GENDER SELECTION
          ===================================================== -->
 
-    <section
-      id="genderSelection"
-      hidden
+    <!-- =====================================================
+     STUDENT PROFILE
+     ===================================================== -->
+
+<section
+  id="genderSelection"
+  hidden
+>
+
+  <div class="section-heading">
+
+    <div>
+      <h2>Complete your profile</h2>
+
+      <p>
+        Enter your phone number and confirm your
+        accommodation details to continue.
+      </p>
+    </div>
+
+  </div>
+
+
+  <!-- PHONE NUMBER -->
+
+  <div class="profile-field">
+
+    <label for="phoneNumber">
+      Phone Number
+    </label>
+
+    <input
+      id="phoneNumber"
+      type="tel"
+      inputmode="tel"
+      autocomplete="tel"
+      placeholder="e.g. 0241234567"
+      aria-describedby="phoneHelp genderMessage"
     >
 
-      <div class="section-heading">
+    <small id="phoneHelp">
+      Use a Ghanaian mobile number, e.g. 0241234567
+      or +233241234567.
+    </small>
 
-        <div>
-          <h2>Complete your profile</h2>
+  </div>
 
-          <p>
-            Select your gender to continue to room selection.
-          </p>
-        </div>
 
-      </div>
+  <!-- GENDER -->
 
-      <div class="choices">
+  <div
+    id="genderChoices"
+    class="profile-gender"
+  >
 
-        <button
-          type="button"
-          class="choice-button gender-choice"
-          data-gender="MALE"
-        >
-          <strong>Male</strong>
+    <h3>Gender</h3>
 
-          <span>
-            Select male accommodation
-          </span>
-        </button>
+    <p>
+      Select your gender to determine eligible
+      accommodation.
+    </p>
 
-        <button
-          type="button"
-          class="choice-button gender-choice"
-          data-gender="FEMALE"
-        >
-          <strong>Female</strong>
+    <div class="choices">
 
-          <span>
-            Select female accommodation
-          </span>
-        </button>
+      <button
+        type="button"
+        class="choice-button gender-choice"
+        data-gender="MALE"
+      >
+        <strong>Male</strong>
 
-      </div>
+        <span>
+          Select male accommodation
+        </span>
+      </button>
 
-      <p
-        id="genderMessage"
-        role="alert"
-        aria-live="polite"
-      ></p>
+      <button
+        type="button"
+        class="choice-button gender-choice"
+        data-gender="FEMALE"
+      >
+        <strong>Female</strong>
 
-    </section>
+        <span>
+          Select female accommodation
+        </span>
+      </button>
+
+    </div>
+
+  </div>
+
+
+  <!-- Existing gender students need only save phone -->
+
+  <button
+    id="savePhoneButton"
+    type="button"
+    class="primary-action"
+    hidden
+  >
+    Save phone number
+    <span aria-hidden="true">→</span>
+  </button>
+
+
+  <p
+    id="genderMessage"
+    role="alert"
+    aria-live="polite"
+  ></p>
+
+</section>
 
 
     <!-- =====================================================
