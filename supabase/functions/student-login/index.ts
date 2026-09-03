@@ -9,25 +9,15 @@ const corsHeaders = {
   'Content-Type': 'application/json',
 };
 
-function response(
-  body: unknown,
-  status = 200
-) {
-  return new Response(
-    JSON.stringify(body),
-    {
-      status,
-      headers: corsHeaders,
-    }
-  );
+function response(body: unknown, status = 200) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: corsHeaders,
+  });
 }
-
 
 // ------------------------------------------------------------
 // Supabase Admin client
-//
-// IMPORTANT:
-// This client is NEVER exposed to the browser.
 // ------------------------------------------------------------
 
 const supabaseAdmin = createClient(
@@ -41,55 +31,80 @@ const supabaseAdmin = createClient(
   }
 );
 
-
 // ------------------------------------------------------------
-// Deterministic internal email for every student.
-//
-// Students never see or use this email.
-// It exists solely because Supabase password authentication
-// requires an email or phone identifier.
+// Deterministic internal email for every student
 //
 // Example:
-//
 // UHAS202212783
 //
 // becomes:
-//
 // uhas202212783@student-login.uhas.local
 // ------------------------------------------------------------
 
-function studentAuthEmail(
-  studentId: string
-) {
-  const normalized =
-    studentId
-      .trim()
-      .toLowerCase()
-      .replace(/[^a-z0-9]/g, '');
+function studentAuthEmail(studentId: string) {
+  const normalized = studentId
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, '');
 
   return `${normalized}@student-login.uhas.local`;
 }
 
+// ------------------------------------------------------------
+// Create permanent student Auth account
+// ------------------------------------------------------------
+
+async function createPermanentStudentAccount(
+  studentId: string,
+  accessCode: string,
+  email: string
+) {
+  const {
+    data: created,
+    error: createError,
+  } = await supabaseAdmin.auth.admin.createUser({
+    email,
+    password: accessCode,
+    email_confirm: true,
+    user_metadata: {
+      student_id: studentId,
+    },
+    app_metadata: {
+      account_type: 'student',
+      student_id: studentId,
+    },
+  });
+
+  if (createError || !created?.user) {
+    console.error(
+      'Permanent student Auth account creation failed:',
+      {
+        message: createError?.message,
+        code: createError?.code,
+        status: createError?.status,
+      }
+    );
+
+    throw new Error('Unable to create student account');
+  }
+
+  return created.user;
+}
 
 // ------------------------------------------------------------
 // Main handler
 // ------------------------------------------------------------
 
 Deno.serve(async (req) => {
-
   // ----------------------------------------------------------
   // CORS
   // ----------------------------------------------------------
 
   if (req.method === 'OPTIONS') {
-    return new Response(
-      'ok',
-      {
-        headers: corsHeaders,
-      }
-    );
+    return new Response('ok', {
+      headers: corsHeaders,
+    });
   }
-
 
   // ----------------------------------------------------------
   // POST only
@@ -104,9 +119,7 @@ Deno.serve(async (req) => {
     );
   }
 
-
   try {
-
     // --------------------------------------------------------
     // 1. Read credentials
     // --------------------------------------------------------
@@ -121,34 +134,27 @@ Deno.serve(async (req) => {
     } catch {
       return response(
         {
-          error:
-            'Invalid index number or access code',
+          error: 'Invalid index number or access code',
         },
         401
       );
     }
 
+    const studentId = String(body.student_id ?? '')
+      .trim()
+      .toUpperCase();
 
-    const studentId =
-      String(body.student_id ?? '')
-        .trim()
-        .toUpperCase();
-
-    const accessCode =
-      String(body.access_code ?? '')
-        .trim();
-
+    const accessCode = String(body.access_code ?? '')
+      .trim();
 
     if (!studentId || !accessCode) {
       return response(
         {
-          error:
-            'Invalid index number or access code',
+          error: 'Invalid index number or access code',
         },
         401
       );
     }
-
 
     // --------------------------------------------------------
     // 2. Authenticate against database
@@ -157,39 +163,37 @@ Deno.serve(async (req) => {
     const {
       data: students,
       error: authError,
-    } =
-      await supabaseAdmin.rpc(
-        'authenticate_student_access_code',
-        {
-          p_student_id: studentId,
-          p_access_code: accessCode,
-        }
-      );
-
+    } = await supabaseAdmin.rpc(
+      'authenticate_student_access_code',
+      {
+        p_student_id: studentId,
+        p_access_code: accessCode,
+      }
+    );
 
     if (
       authError ||
       !students ||
       students.length === 0
     ) {
-
       console.error(
         'Student credential verification failed:',
-        authError
+        {
+          message: authError?.message,
+          code: authError?.code,
+          status: authError?.status,
+        }
       );
 
       return response(
         {
-          error:
-            'Invalid index number or access code',
+          error: 'Invalid index number or access code',
         },
         401
       );
     }
 
-
     const student = students[0];
-
 
     // --------------------------------------------------------
     // 3. Verify eligibility
@@ -205,94 +209,83 @@ Deno.serve(async (req) => {
       );
     }
 
-
     // --------------------------------------------------------
-    // 4. Determine the permanent Auth account
-    // --------------------------------------------------------
-
-    const email =
-      studentAuthEmail(student.student_id);
-
-
-    let authUserId =
-      student.auth_user_id;
-
-
-    // --------------------------------------------------------
-    // 5. Create Auth account if it does not exist
+    // 4. Determine student's Auth account
     // --------------------------------------------------------
 
-    if (!authUserId) {
+    const email = studentAuthEmail(
+      student.student_id
+    );
 
+    let authUserId = student.auth_user_id;
+
+    // --------------------------------------------------------
+    // 5. Check existing Auth account
+    // --------------------------------------------------------
+
+    let existingAuthUser = null;
+
+    if (authUserId) {
       const {
-        data: created,
-        error: createError,
+        data: existingUserData,
+        error: existingUserError,
       } =
-        await supabaseAdmin.auth.admin.createUser({
-          email,
-          password: accessCode,
-          email_confirm: true,
-          user_metadata: {
-            student_id:
-              student.student_id,
-          },
-          app_metadata: {
-            account_type:
-              'student',
-            student_id:
-              student.student_id,
-          },
-        });
-
-
-      if (createError) {
-
-        console.error(
-          'Auth account creation failed:',
-          createError
+        await supabaseAdmin.auth.admin.getUserById(
+          authUserId
         );
 
-        return response(
+      if (existingUserError) {
+        console.warn(
+          'Existing Auth user could not be retrieved:',
           {
-            error:
-              'Unable to create student account',
-          },
-          500
+            authUserId,
+            message: existingUserError.message,
+            code: existingUserError.code,
+            status: existingUserError.status,
+          }
         );
+
+        existingAuthUser = null;
+      } else {
+        existingAuthUser =
+          existingUserData?.user ?? null;
       }
+    }
 
+    // --------------------------------------------------------
+    // 6. No valid Auth account
+    //
+    // Create a permanent account.
+    // --------------------------------------------------------
 
-      authUserId =
-        created.user.id;
+    if (!existingAuthUser) {
+      const oldAuthUserId = authUserId;
 
+      const createdUser =
+        await createPermanentStudentAccount(
+          student.student_id,
+          accessCode,
+          email
+        );
 
-      // ------------------------------------------------------
-      // Link the permanent Auth account to the student.
-      // ------------------------------------------------------
+      authUserId = createdUser.id;
 
+      // Link permanent account to student
       const {
         error: linkError,
-      } =
-        await supabaseAdmin
-          .from('students')
-          .update({
-            auth_user_id:
-              authUserId,
-          })
-          .eq(
-            'id',
-            student.id
-          );
-
+      } = await supabaseAdmin
+        .from('students')
+        .update({
+          auth_user_id: authUserId,
+        })
+        .eq('id', student.id);
 
       if (linkError) {
-
         console.error(
-          'Failed to link Auth account:',
+          'Failed to link permanent Auth account:',
           linkError
         );
 
-        // Prevent orphaned accounts from remaining around.
         await supabaseAdmin.auth.admin.deleteUser(
           authUserId
         );
@@ -306,23 +299,123 @@ Deno.serve(async (req) => {
         );
       }
 
-    } else {
+      // Delete stale/anonymous account if one existed
+      if (
+        oldAuthUserId &&
+        oldAuthUserId !== authUserId
+      ) {
+        const {
+          error: deleteOldUserError,
+        } =
+          await supabaseAdmin.auth.admin.deleteUser(
+            oldAuthUserId
+          );
 
-      // ------------------------------------------------------
-      // Existing permanent Auth account.
-      //
-      // Synchronise the password with the current access code.
-      //
-      // This allows an administrator to regenerate/change an
-      // access code without leaving the old Auth password active.
-      // ------------------------------------------------------
+        if (deleteOldUserError) {
+          console.warn(
+            'Old Auth account could not be deleted:',
+            {
+              authUserId: oldAuthUserId,
+              message:
+                deleteOldUserError.message,
+            }
+          );
+        }
+      }
+    }
 
+    // --------------------------------------------------------
+    // 7. Existing account is anonymous
+    //
+    // This fixes the old device-specific authentication.
+    // --------------------------------------------------------
+
+    else if (existingAuthUser.is_anonymous) {
+      const oldAnonymousUserId =
+        existingAuthUser.id;
+
+      console.log(
+        'Detected old anonymous student account. ' +
+        'Creating permanent account.',
+        {
+          studentId: student.student_id,
+          oldAuthUserId: oldAnonymousUserId,
+        }
+      );
+
+      // Create permanent account
+      const createdUser =
+        await createPermanentStudentAccount(
+          student.student_id,
+          accessCode,
+          email
+        );
+
+      authUserId = createdUser.id;
+
+      // Relink student
+      const {
+        error: linkError,
+      } = await supabaseAdmin
+        .from('students')
+        .update({
+          auth_user_id: authUserId,
+        })
+        .eq('id', student.id);
+
+      if (linkError) {
+        console.error(
+          'Failed to relink student to permanent Auth account:',
+          linkError
+        );
+
+        await supabaseAdmin.auth.admin.deleteUser(
+          authUserId
+        );
+
+        return response(
+          {
+            error:
+              'Unable to complete student account setup',
+          },
+          500
+        );
+      }
+
+      // Delete old anonymous account
+      const {
+        error: deleteAnonymousError,
+      } =
+        await supabaseAdmin.auth.admin.deleteUser(
+          oldAnonymousUserId
+        );
+
+      if (deleteAnonymousError) {
+        console.warn(
+          'Old anonymous account could not be deleted:',
+          {
+            authUserId: oldAnonymousUserId,
+            message:
+              deleteAnonymousError.message,
+          }
+        );
+      }
+    }
+
+    // --------------------------------------------------------
+    // 8. Existing permanent account
+    //
+    // Synchronise its password with the current access code.
+    // --------------------------------------------------------
+
+    else {
       const {
         error: updateError,
       } =
         await supabaseAdmin.auth.admin.updateUserById(
-          authUserId,
+          existingAuthUser.id,
           {
+            email,
             password: accessCode,
             email_confirm: true,
             user_metadata: {
@@ -330,20 +423,21 @@ Deno.serve(async (req) => {
                 student.student_id,
             },
             app_metadata: {
-              account_type:
-                'student',
+              account_type: 'student',
               student_id:
                 student.student_id,
             },
           }
         );
 
-
       if (updateError) {
-
         console.error(
-          'Auth account update failed:',
-          updateError
+          'Permanent Auth account update failed:',
+          {
+            message: updateError.message,
+            code: updateError.code,
+            status: updateError.status,
+          }
         );
 
         return response(
@@ -356,27 +450,22 @@ Deno.serve(async (req) => {
       }
     }
 
-
     // --------------------------------------------------------
-    // 6. Create a completely separate client for signing in.
+    // 9. Sign in using normal Supabase Auth
     //
-    // NEVER use the service-role client for this operation.
-    //
-    // signInWithPassword creates the actual student session.
+    // NEVER use the service-role client for sign-in.
     // --------------------------------------------------------
 
-    const supabaseAuth =
-      createClient(
-        Deno.env.get('SUPABASE_URL')!,
-        Deno.env.get('SUPABASE_ANON_KEY')!,
-        {
-          auth: {
-            persistSession: false,
-            autoRefreshToken: false,
-          },
-        }
-      );
-
+    const supabaseAuth = createClient(
+      Deno.env.get('SUPABASE_URL')!,
+      Deno.env.get('SUPABASE_ANON_KEY')!,
+      {
+        auth: {
+          persistSession: false,
+          autoRefreshToken: false,
+        },
+      }
+    );
 
     const {
       data: loginData,
@@ -387,15 +476,17 @@ Deno.serve(async (req) => {
         password: accessCode,
       });
 
-
     if (
       loginError ||
-      !loginData.session
+      !loginData?.session
     ) {
-
       console.error(
         'Student Auth sign-in failed:',
-        loginError
+        {
+          message: loginError?.message,
+          code: loginError?.code,
+          status: loginError?.status,
+        }
       );
 
       return response(
@@ -407,9 +498,8 @@ Deno.serve(async (req) => {
       );
     }
 
-
     // --------------------------------------------------------
-    // 7. Return Supabase session to browser
+    // 10. Return the real Supabase session
     // --------------------------------------------------------
 
     return response({
@@ -452,9 +542,7 @@ Deno.serve(async (req) => {
           student.eligible,
       },
     });
-
   } catch (error) {
-
     console.error(
       'Student login error:',
       error
@@ -463,7 +551,9 @@ Deno.serve(async (req) => {
     return response(
       {
         error:
-          'Unable to process login request',
+          error instanceof Error
+            ? error.message
+            : 'Unable to process login request',
       },
       500
     );
