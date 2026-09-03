@@ -1,5 +1,4 @@
-import { createClient } from
-  'https://esm.sh/@supabase/supabase-js@2';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 import {
   SUPABASE_URL,
@@ -85,11 +84,10 @@ let holdTimer = null;
 
 
 // --------------------------------------------------
-// APPLICATION BRANDING
+// BRANDING
 // --------------------------------------------------
 
 function applyBranding() {
-
   document.title =
     'UHAS Asogli Hall Room Allocation';
 
@@ -102,26 +100,6 @@ function applyBranding() {
     element.textContent =
       'UHAS Asogli Hall Room Allocation';
   });
-
-  const msaElements =
-    document.querySelectorAll(
-      '*'
-    );
-
-  msaElements.forEach(element => {
-
-    if (
-      element.children.length === 0 &&
-      element.textContent.includes('UHAS MSA Room Allocation')
-    ) {
-      element.textContent =
-        element.textContent.replace(
-          /UHAS MSA Room Allocation/g,
-          'UHAS Asogli Hall Room Allocation'
-        );
-    }
-
-  });
 }
 
 
@@ -130,7 +108,6 @@ function applyBranding() {
 // --------------------------------------------------
 
 function showMessage(text, type = '') {
-
   if (!msg) return;
 
   msg.textContent = text;
@@ -139,7 +116,6 @@ function showMessage(text, type = '') {
 
 
 function escapeHtml(value) {
-
   return String(value ?? '')
     .replaceAll('&', '&amp;')
     .replaceAll('<', '&lt;')
@@ -150,26 +126,37 @@ function escapeHtml(value) {
 
 
 function normalizeGender(value) {
-
   return String(value ?? '')
     .trim()
     .toUpperCase();
 }
 
 
-function showSection(section) {
+function normalizePhoneNumber(value) {
+  return String(value ?? '')
+    .trim();
+}
 
+
+function isValidGhanaPhone(value) {
+  const phone =
+    normalizePhoneNumber(value);
+
+  return /^(0[2356789][0-9]{8}|\+233[2356789][0-9]{8})$/
+    .test(phone);
+}
+
+
+function showSection(section) {
   [
     genderSection,
     blockSection,
     roomsSection,
     allocationSection
   ].forEach(element => {
-
     if (element) {
       element.hidden = true;
     }
-
   });
 
   if (section) {
@@ -179,7 +166,6 @@ function showSection(section) {
 
 
 function disableButtons(selector, disabled) {
-
   document
     .querySelectorAll(selector)
     .forEach(button => {
@@ -188,12 +174,14 @@ function disableButtons(selector, disabled) {
 }
 
 
-function setLoading(button, loading, text = 'Loading...') {
-
+function setLoading(
+  button,
+  loading,
+  text = 'Loading...'
+) {
   if (!button) return;
 
   if (loading) {
-
     button.dataset.originalText =
       button.textContent;
 
@@ -201,15 +189,12 @@ function setLoading(button, loading, text = 'Loading...') {
 
     button.innerHTML =
       `<span class="button-spinner" aria-hidden="true"></span>${escapeHtml(text)}`;
-
   } else {
-
     button.disabled = false;
 
     button.textContent =
       button.dataset.originalText ||
       button.textContent;
-
   }
 }
 
@@ -219,7 +204,6 @@ function setLoading(button, loading, text = 'Loading...') {
 // --------------------------------------------------
 
 function createApplicationHeader() {
-
   if (
     document.querySelector('.app-brand-header')
   ) {
@@ -233,21 +217,26 @@ function createApplicationHeader() {
     'app-brand-header';
 
   header.innerHTML = `
-
     <div class="app-brand-mark">
-      <div class="brand-monogram">UHAS</div>
+
+      <div class="brand-monogram">
+        UHAS
+      </div>
 
       <div class="brand-copy">
         <strong>Asogli Hall</strong>
         <span>Room Allocation</span>
       </div>
+
     </div>
 
     <div class="brand-status">
-      <span class="status-dot"></span>
-      Accommodation Portal
-    </div>
 
+      <span class="status-dot"></span>
+
+      Accommodation Portal
+
+    </div>
   `;
 
   document.body.prepend(header);
@@ -259,12 +248,12 @@ function createApplicationHeader() {
 // --------------------------------------------------
 
 function updateProgress(step) {
-
   let progress =
-    document.querySelector('.allocation-progress');
+    document.querySelector(
+      '.allocation-progress'
+    );
 
   if (!progress) {
-
     progress =
       document.createElement('div');
 
@@ -272,7 +261,6 @@ function updateProgress(step) {
       'allocation-progress';
 
     document.body.appendChild(progress);
-
   }
 
   const steps = [
@@ -285,8 +273,8 @@ function updateProgress(step) {
 
   progress.innerHTML =
     steps.map((item, index) => {
-
-      const number = index + 1;
+      const number =
+        index + 1;
 
       let state = '';
 
@@ -302,9 +290,7 @@ function updateProgress(step) {
           <label>${item[1]}</label>
         </div>
       `;
-
     }).join('');
-
 }
 
 
@@ -313,12 +299,12 @@ function updateProgress(step) {
 // --------------------------------------------------
 
 async function ensureSession() {
-
   const {
     data: {
       session
     }
-  } = await supabase.auth.getSession();
+  } =
+    await supabase.auth.getSession();
 
   if (session) {
     return session;
@@ -327,14 +313,16 @@ async function ensureSession() {
   const {
     data,
     error
-  } = await supabase.auth.signInAnonymously();
+  } =
+    await supabase.auth.signInAnonymously();
 
-  if (error || !data?.session) {
-
+  if (
+    error ||
+    !data?.session
+  ) {
     throw new Error(
       'Unable to start a secure session. Please try again.'
     );
-
   }
 
   return data.session;
@@ -346,6 +334,14 @@ async function ensureSession() {
 // --------------------------------------------------
 
 async function activateStudent() {
+  if (!indexInput || !accessCodeInput) {
+    showMessage(
+      'Login form is unavailable.',
+      'error'
+    );
+
+    return;
+  }
 
   const studentId =
     indexInput.value.trim();
@@ -354,7 +350,6 @@ async function activateStudent() {
     accessCodeInput.value.trim();
 
   if (!studentId || !accessCode) {
-
     showMessage(
       'Enter your index number and access code.',
       'error'
@@ -374,29 +369,30 @@ async function activateStudent() {
   );
 
   try {
-
     await ensureSession();
 
     const {
       data,
       error
-    } = await supabase.functions.invoke(
-      'student-login',
-      {
-        body: {
-          student_id: studentId,
-          access_code: accessCode
+    } =
+      await supabase.functions.invoke(
+        'student-login',
+        {
+          body: {
+            student_id: studentId,
+            access_code: accessCode
+          }
         }
-      }
-    );
+      );
 
-    if (error || !data?.success) {
-
+    if (
+      error ||
+      !data?.success
+    ) {
       throw new Error(
         data?.error ||
         'Invalid index number or access code.'
       );
-
     }
 
     currentStudent =
@@ -406,7 +402,9 @@ async function activateStudent() {
       `Welcome, ${data.student.student_name}.`
     );
 
-    loginSection.hidden = true;
+    if (loginSection) {
+      loginSection.hidden = true;
+    }
 
     const alreadyAllocated =
       await loadExistingAllocation();
@@ -415,60 +413,50 @@ async function activateStudent() {
       return;
     }
 
-    const gender =
-      normalizeGender(
-        data.student.gender
-      );
-
-   showGenderSelection();
+    await showGenderSelection();
 
   } catch (error) {
+    console.error(
+      'Student login error:',
+      error
+    );
 
     showMessage(
-      error.message ||
+      error?.message ||
       'Unable to sign in.',
       'error'
     );
 
   } finally {
-
     setLoading(
       loginButton,
       false
     );
-
   }
 }
+
 
 // --------------------------------------------------
 // STUDENT PHONE NUMBER
 // --------------------------------------------------
 
-function normalizePhoneNumber(value) {
-  return String(value ?? '').trim();
-}
-
-
-function isValidGhanaPhone(value) {
-  const phone = normalizePhoneNumber(value);
-
-  return /^(0[2356789][0-9]{8}|\+233[2356789][0-9]{8})$/
-    .test(phone);
-}
-
-
 async function loadStudentPhone() {
-
   const {
     data,
     error
-  } = await supabase.rpc(
-    'get_student_phone'
-  );
+  } =
+    await supabase.rpc(
+      'get_student_phone'
+    );
 
   if (error) {
+    console.error(
+      'get_student_phone error:',
+      error
+    );
+
     throw new Error(
-      'Unable to load your phone number.'
+      'Unable to load your phone number. Please contact the accommodation administrator.'
     );
   }
 
@@ -477,7 +465,6 @@ async function loadStudentPhone() {
 
 
 async function saveStudentPhone() {
-
   const phone =
     normalizePhoneNumber(
       phoneNumberInput?.value
@@ -498,14 +485,20 @@ async function saveStudentPhone() {
   const {
     data,
     error
-  } = await supabase.rpc(
-    'update_student_phone',
-    {
-      p_phone: phone
-    }
-  );
+  } =
+    await supabase.rpc(
+      'update_student_phone',
+      {
+        p_phone: phone
+      }
+    );
 
   if (error) {
+    console.error(
+      'update_student_phone error:',
+      error
+    );
+
     throw new Error(
       error.message ||
       'Unable to save your phone number.'
@@ -521,62 +514,268 @@ async function saveStudentPhone() {
 }
 
 
-async function savePhoneAndContinue() {
+// --------------------------------------------------
+// GENDER / PHONE PROFILE SCREEN
+// --------------------------------------------------
 
+async function showGenderSelection() {
+  updateProgress(2);
+
+  showSection(
+    genderSection
+  );
+
+  if (genderMessage) {
+    genderMessage.className = '';
+    genderMessage.textContent = '';
+  }
+
+  if (!phoneNumberInput) {
+    if (genderMessage) {
+      genderMessage.className =
+        'error';
+
+      genderMessage.textContent =
+        'Phone number field is unavailable. Please contact the administrator.';
+    }
+
+    return;
+  }
+
+  try {
+    const existingPhone =
+      await loadStudentPhone();
+
+    phoneNumberInput.value =
+      existingPhone || '';
+
+  } catch (error) {
+    console.error(
+      'Unable to load phone:',
+      error
+    );
+
+    if (genderMessage) {
+      genderMessage.className =
+        'error';
+
+      genderMessage.textContent =
+        error.message;
+    }
+
+    return;
+  }
+
+  const gender =
+    normalizeGender(
+      currentStudent?.gender
+    );
+
+  /*
+   * If the student already has a gender,
+   * don't ask them to select it again.
+   *
+   * They only need to confirm/save
+   * their phone number.
+   */
+
+  if (
+    gender === 'MALE' ||
+    gender === 'FEMALE'
+  ) {
+    if (genderChoices) {
+      genderChoices.hidden = true;
+    }
+
+    if (savePhoneButton) {
+      savePhoneButton.hidden = false;
+    }
+
+    if (genderMessage) {
+      genderMessage.textContent =
+        'Please confirm your phone number before continuing.';
+    }
+
+    return;
+  }
+
+  /*
+   * No gender yet.
+   * Show the gender choices.
+   */
+
+  if (genderChoices) {
+    genderChoices.hidden = false;
+  }
+
+  if (savePhoneButton) {
+    savePhoneButton.hidden = true;
+  }
+
+  if (genderMessage) {
+    genderMessage.textContent =
+      'Enter your phone number, then select your gender to continue.';
+  }
+}
+
+
+// --------------------------------------------------
+// SAVE PHONE AND CONTINUE
+// --------------------------------------------------
+
+async function savePhoneAndContinue() {
   if (!savePhoneButton) {
     return;
   }
 
-  savePhoneButton.disabled = true;
+  setLoading(
+    savePhoneButton,
+    true,
+    'Saving...'
+  );
 
-  genderMessage.className = '';
-
-  genderMessage.textContent =
-    'Saving your phone number...';
-
-  try {
-
-    await saveStudentPhone();
-
-    genderMessage.className =
-      'success-message';
+  if (genderMessage) {
+    genderMessage.className = '';
 
     genderMessage.textContent =
-      'Phone number saved securely.';
+      'Saving your phone number securely...';
+  }
+
+  try {
+    await saveStudentPhone();
+
+    if (genderMessage) {
+      genderMessage.className =
+        'success-message';
+
+      genderMessage.textContent =
+        'Phone number saved securely.';
+    }
 
     setTimeout(() => {
       showBlockSelection();
     }, 350);
 
   } catch (error) {
+    if (genderMessage) {
+      genderMessage.className =
+        'error';
 
-    genderMessage.className =
-      'error';
+      genderMessage.textContent =
+        error.message ||
+        'Unable to save your phone number.';
+    }
 
-    genderMessage.textContent =
-      error.message ||
-      'Unable to save your phone number.';
-
-    savePhoneButton.disabled = false;
+    setLoading(
+      savePhoneButton,
+      false
+    );
   }
 }
-currentStudent =
-  data.student;
 
-showMessage(
-  `Welcome, ${data.student.student_name}.`
-);
 
-loginSection.hidden = true;
+// --------------------------------------------------
+// SELECT GENDER
+// --------------------------------------------------
 
-const alreadyAllocated =
-  await loadExistingAllocation();
+async function selectGender(gender) {
+  const normalized =
+    normalizeGender(gender);
 
-if (alreadyAllocated) {
-  return;
+  if (
+    normalized !== 'MALE' &&
+    normalized !== 'FEMALE'
+  ) {
+    return;
+  }
+
+  const buttons =
+    document.querySelectorAll(
+      '.gender-choice'
+    );
+
+  buttons.forEach(button => {
+    button.disabled = true;
+  });
+
+  if (genderMessage) {
+    genderMessage.className = '';
+
+    genderMessage.textContent =
+      'Saving your details securely...';
+  }
+
+  try {
+    /*
+     * Phone number must be saved first.
+     */
+
+    await saveStudentPhone();
+
+    /*
+     * Save gender through the existing RPC.
+     */
+
+    const {
+      data,
+      error
+    } =
+      await supabase.rpc(
+        'set_student_gender',
+        {
+          p_gender: normalized
+        }
+      );
+
+    if (error) {
+      throw new Error(
+        error.message ||
+        'Unable to save your gender.'
+      );
+    }
+
+    /*
+     * Update local student state.
+     */
+
+    if (currentStudent) {
+      currentStudent.gender =
+        data ||
+        normalized;
+    }
+
+    if (genderMessage) {
+      genderMessage.className =
+        'success-message';
+
+      genderMessage.textContent =
+        'Your details have been saved.';
+    }
+
+    setTimeout(() => {
+      showBlockSelection();
+    }, 350);
+
+  } catch (error) {
+    console.error(
+      'Gender selection error:',
+      error
+    );
+
+    if (genderMessage) {
+      genderMessage.className =
+        'error';
+
+      genderMessage.textContent =
+        error.message ||
+        'Unable to save your details.';
+    }
+
+    buttons.forEach(button => {
+      button.disabled = false;
+    });
+  }
 }
-
-showGenderSelection();
 
 
 // --------------------------------------------------
@@ -584,18 +783,19 @@ showGenderSelection();
 // --------------------------------------------------
 
 function showBlockSelection() {
-
   updateProgress(3);
 
-  blockMessage.textContent = '';
+  if (blockMessage) {
+    blockMessage.textContent = '';
+  }
 
-  showSection(blockSection);
-
+  showSection(
+    blockSection
+  );
 }
 
 
 function selectBlock(block) {
-
   const validBlocks = [
     'Ahoe',
     'Bankoe',
@@ -603,7 +803,9 @@ function selectBlock(block) {
     'Hliha'
   ];
 
-  if (!validBlocks.includes(block)) {
+  if (
+    !validBlocks.includes(block)
+  ) {
     return;
   }
 
@@ -611,7 +813,6 @@ function selectBlock(block) {
     block;
 
   loadRooms(block);
-
 }
 
 
@@ -619,14 +820,12 @@ function selectBlock(block) {
 // ROOM LOADING
 // --------------------------------------------------
 
-async function loadRooms(block = selectedBlock) {
-
+async function loadRooms(
+  block = selectedBlock
+) {
   if (!block) {
-
     showBlockSelection();
-
     return;
-
   }
 
   selectedBlock =
@@ -634,13 +833,20 @@ async function loadRooms(block = selectedBlock) {
 
   updateProgress(4);
 
-  showSection(roomsSection);
+  showSection(
+    roomsSection
+  );
 
-  roomSubtitle.textContent =
-    `${block} Block`;
+  if (roomSubtitle) {
+    roomSubtitle.textContent =
+      `${block} Block`;
+  }
+
+  if (!grid) {
+    return;
+  }
 
   grid.innerHTML = `
-
     <div class="rooms-loading">
 
       <div class="loading-orbit"></div>
@@ -653,47 +859,40 @@ async function loadRooms(block = selectedBlock) {
       </p>
 
     </div>
-
   `;
 
   try {
-
     const {
       data,
       error
-    } = await supabase.functions.invoke(
-      'rooms',
-      {
-        body: {
-          block
+    } =
+      await supabase.functions.invoke(
+        'rooms',
+        {
+          body: {
+            block
+          }
         }
-      }
-    );
+      );
 
     if (error) {
-
       throw new Error(
         error.message ||
         'Unable to load rooms.'
       );
-
     }
 
     if (data?.error) {
-
       throw new Error(
         data.error
       );
-
     }
 
     const rooms =
       data?.rooms ?? [];
 
     if (!rooms.length) {
-
       grid.innerHTML = `
-
         <div class="empty-state modern-empty">
 
           <div class="empty-icon">
@@ -710,28 +909,31 @@ async function loadRooms(block = selectedBlock) {
           <button
             id="returnToBlocks"
             class="secondary-button"
+            type="button"
           >
             Choose another block
           </button>
 
         </div>
-
       `;
 
-      document
-        .getElementById('returnToBlocks')
-        .addEventListener(
+      const returnButton =
+        document.getElementById(
+          'returnToBlocks'
+        );
+
+      if (returnButton) {
+        returnButton.addEventListener(
           'click',
           showBlockSelection
         );
+      }
 
       return;
     }
 
-
     grid.innerHTML =
       rooms.map(room => {
-
         const availableBeds =
           Number(
             room.available_beds ?? 0
@@ -761,7 +963,6 @@ async function loadRooms(block = selectedBlock) {
         if (
           roomGender === 'MALE'
         ) {
-
           genderLabel =
             'Male room';
 
@@ -771,15 +972,17 @@ async function loadRooms(block = selectedBlock) {
         } else if (
           roomGender === 'FEMALE'
         ) {
-
           genderLabel =
             'Female room';
 
           genderClass =
             'female';
-
         }
 
+        /*
+         * Dome rooms 31–40 are permanently
+         * male-only.
+         */
 
         const isDomeMaleOnly =
           room.block === 'Dome' &&
@@ -787,32 +990,28 @@ async function loadRooms(block = selectedBlock) {
             String(room.room_number)
           );
 
-
         if (isDomeMaleOnly) {
-
           genderLabel =
             'Male only';
 
           genderClass =
             'male-only';
-
         }
 
-
         const occupancyPercent =
-          Math.min(
-            100,
-            Math.round(
-              (occupiedBeds / capacity) * 100
-            )
-          );
-
+          capacity > 0
+            ? Math.min(
+                100,
+                Math.round(
+                  (occupiedBeds / capacity) * 100
+                )
+              )
+            : 0;
 
         const bedVisual =
           Array.from(
             { length: capacity },
             (_, index) => {
-
               const occupied =
                 index < occupiedBeds;
 
@@ -824,13 +1023,10 @@ async function loadRooms(block = selectedBlock) {
                   ${occupied ? '●' : '○'}
                 </span>
               `;
-
             }
           ).join('');
 
-
         return `
-
           <article
             class="room-card modern-room-card"
           >
@@ -914,8 +1110,10 @@ async function loadRooms(block = selectedBlock) {
 
 
             <button
+              type="button"
               class="select-room modern-select-room"
               data-room-id="${escapeHtml(room.id)}"
+              ${availableBeds <= 0 ? 'disabled' : ''}
             >
 
               <span>Select this room</span>
@@ -925,30 +1123,28 @@ async function loadRooms(block = selectedBlock) {
             </button>
 
           </article>
-
         `;
-
       }).join('');
-
 
     document
       .querySelectorAll('.select-room')
       .forEach(button => {
-
         button.addEventListener(
           'click',
-          () => holdRoom(
-            button.dataset.roomId
-          )
+          () =>
+            holdRoom(
+              button.dataset.roomId
+            )
         );
-
       });
 
-
   } catch (error) {
+    console.error(
+      'Room loading error:',
+      error
+    );
 
     grid.innerHTML = `
-
       <div class="empty-state modern-empty">
 
         <div class="empty-icon error-icon">
@@ -967,23 +1163,26 @@ async function loadRooms(block = selectedBlock) {
         <button
           id="retryRooms"
           class="secondary-button"
+          type="button"
         >
           Try again
         </button>
 
       </div>
-
     `;
 
-    document
-      .getElementById('retryRooms')
-      .addEventListener(
+    const retryButton =
+      document.getElementById(
+        'retryRooms'
+      );
+
+    if (retryButton) {
+      retryButton.addEventListener(
         'click',
         () => loadRooms(block)
       );
-
+    }
   }
-
 }
 
 
@@ -992,12 +1191,10 @@ async function loadRooms(block = selectedBlock) {
 // --------------------------------------------------
 
 if (changeBlockButton) {
-
   changeBlockButton.addEventListener(
     'click',
     showBlockSelection
   );
-
 }
 
 
@@ -1006,6 +1203,9 @@ if (changeBlockButton) {
 // --------------------------------------------------
 
 async function holdRoom(roomId) {
+  if (!roomId) {
+    return;
+  }
 
   disableButtons(
     '.select-room',
@@ -1013,35 +1213,31 @@ async function holdRoom(roomId) {
   );
 
   try {
-
     const {
       data,
       error
-    } = await supabase.functions.invoke(
-      'allocate-room',
-      {
-        body: {
-          action: 'hold',
-          room_id: roomId
+    } =
+      await supabase.functions.invoke(
+        'allocate-room',
+        {
+          body: {
+            action: 'hold',
+            room_id: roomId
+          }
         }
-      }
-    );
+      );
 
     if (error) {
-
       throw new Error(
         error.message ||
         'Unable to hold room.'
       );
-
     }
 
     if (data?.error) {
-
       throw new Error(
         data.error
       );
-
     }
 
     currentHold =
@@ -1052,6 +1248,10 @@ async function holdRoom(roomId) {
     );
 
   } catch (error) {
+    console.error(
+      'Room hold error:',
+      error
+    );
 
     alert(
       error.message ||
@@ -1061,9 +1261,7 @@ async function holdRoom(roomId) {
     await loadRooms(
       selectedBlock
     );
-
   }
-
 }
 
 
@@ -1072,20 +1270,25 @@ async function holdRoom(roomId) {
 // --------------------------------------------------
 
 function showHoldConfirmation(hold) {
-
   updateProgress(5);
 
   showSection(
     allocationSection
   );
 
-  allocationSection.innerHTML = `
+  if (!allocationSection) {
+    return;
+  }
 
+  allocationSection.innerHTML = `
     <div class="reservation-shell">
 
       <div class="reservation-status">
+
         <span class="status-dot"></span>
+
         Room temporarily reserved
+
       </div>
 
 
@@ -1161,18 +1364,28 @@ function showHoldConfirmation(hold) {
       <div class="reservation-actions">
 
         <button
+          type="button"
           id="confirmAllocation"
           class="primary-action"
         >
+
           Confirm room
-          <span aria-hidden="true">→</span>
+
+          <span aria-hidden="true">
+            →
+          </span>
+
         </button>
 
+
         <button
+          type="button"
           id="cancelHoldView"
           class="secondary-button"
         >
+
           Return to rooms
+
         </button>
 
       </div>
@@ -1184,43 +1397,52 @@ function showHoldConfirmation(hold) {
       ></p>
 
     </div>
-
   `;
 
 
-  document
-    .getElementById('confirmAllocation')
-    .addEventListener(
-      'click',
-      () => confirmAllocation(
-        hold.hold_id
-      )
+  const confirmButton =
+    document.getElementById(
+      'confirmAllocation'
     );
 
+  if (confirmButton) {
+    confirmButton.addEventListener(
+      'click',
+      () =>
+        confirmAllocation(
+          hold.hold_id
+        )
+    );
+  }
 
-  document
-    .getElementById('cancelHoldView')
-    .addEventListener(
+
+  const cancelButton =
+    document.getElementById(
+      'cancelHoldView'
+    );
+
+  if (cancelButton) {
+    cancelButton.addEventListener(
       'click',
       () => {
-
         stopHoldTimer();
 
-        allocationSection.hidden =
-          true;
+        if (allocationSection) {
+          allocationSection.hidden =
+            true;
+        }
 
         loadRooms(
           selectedBlock
         );
-
       }
     );
+  }
 
 
   startHoldCountdown(
     hold
   );
-
 }
 
 
@@ -1229,7 +1451,6 @@ function showHoldConfirmation(hold) {
 // --------------------------------------------------
 
 function startHoldCountdown(hold) {
-
   stopHoldTimer();
 
   const countdown =
@@ -1246,12 +1467,10 @@ function startHoldCountdown(hold) {
     hold.expiresAt;
 
   if (!expiresAt) {
-
     countdown.textContent =
       'Please confirm now';
 
     return;
-
   }
 
   const expiry =
@@ -1261,16 +1480,13 @@ function startHoldCountdown(hold) {
 
 
   function updateCountdown() {
-
     const remaining =
       Math.max(
         0,
         expiry - Date.now()
       );
 
-
     if (remaining <= 0) {
-
       countdown.textContent =
         '00:00';
 
@@ -1278,40 +1494,31 @@ function startHoldCountdown(hold) {
         'expired'
       );
 
-
       const confirmButton =
         document.getElementById(
           'confirmAllocation'
         );
 
-
       if (confirmButton) {
-
         confirmButton.disabled =
           true;
-
       }
-
 
       stopHoldTimer();
 
-
       setTimeout(() => {
-
-        allocationSection.hidden =
-          true;
+        if (allocationSection) {
+          allocationSection.hidden =
+            true;
+        }
 
         loadRooms(
           selectedBlock
         );
-
       }, 1500);
 
-
       return;
-
     }
-
 
     const totalSeconds =
       Math.ceil(
@@ -1326,53 +1533,40 @@ function startHoldCountdown(hold) {
     const seconds =
       totalSeconds % 60;
 
-
     countdown.textContent =
       `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
 
-
     if (remaining <= 30000) {
-
       countdown.classList.add(
         'urgent'
       );
-
     } else {
-
       countdown.classList.remove(
         'urgent'
       );
-
     }
-
   }
 
 
   updateCountdown();
-
 
   holdTimer =
     setInterval(
       updateCountdown,
       1000
     );
-
 }
 
 
 function stopHoldTimer() {
-
   if (holdTimer) {
-
     clearInterval(
       holdTimer
     );
 
     holdTimer =
       null;
-
   }
-
 }
 
 
@@ -1383,7 +1577,6 @@ function stopHoldTimer() {
 async function confirmAllocation(
   holdId
 ) {
-
   const button =
     document.getElementById(
       'confirmAllocation'
@@ -1394,7 +1587,6 @@ async function confirmAllocation(
       'holdMessage'
     );
 
-
   if (
     !button ||
     !message
@@ -1402,15 +1594,17 @@ async function confirmAllocation(
     return;
   }
 
-
   button.disabled =
     true;
 
   button.innerHTML = `
-    <span class="button-spinner"></span>
+    <span
+      class="button-spinner"
+      aria-hidden="true"
+    ></span>
+
     Confirming...
   `;
-
 
   message.className =
     'hold-message';
@@ -1418,51 +1612,45 @@ async function confirmAllocation(
   message.textContent =
     'Finalising your accommodation allocation...';
 
-
   try {
-
     const {
       data,
       error
-    } = await supabase.functions.invoke(
-      'allocate-room',
-      {
-        body: {
-          action: 'confirm',
-          hold_id: holdId
+    } =
+      await supabase.functions.invoke(
+        'allocate-room',
+        {
+          body: {
+            action: 'confirm',
+            hold_id: holdId
+          }
         }
-      }
-    );
-
+      );
 
     if (error) {
-
       throw new Error(
         error.message ||
         'Unable to confirm allocation.'
       );
-
     }
 
-
     if (data?.error) {
-
       throw new Error(
         data.error
       );
-
     }
 
-
     stopHoldTimer();
-
 
     showAllocationReceipt(
       data
     );
 
-
   } catch (error) {
+    console.error(
+      'Allocation confirmation error:',
+      error
+    );
 
     message.className =
       'hold-message error';
@@ -1476,11 +1664,12 @@ async function confirmAllocation(
 
     button.innerHTML = `
       Confirm room
-      <span aria-hidden="true">→</span>
+
+      <span aria-hidden="true">
+        →
+      </span>
     `;
-
   }
-
 }
 
 
@@ -1491,13 +1680,15 @@ async function confirmAllocation(
 function showAllocationReceipt(
   data
 ) {
-
   showSection(
     allocationSection
   );
 
-  allocationSection.innerHTML = `
+  if (!allocationSection) {
+    return;
+  }
 
+  allocationSection.innerHTML = `
     <div class="allocation-success">
 
       <div class="success-mark">
@@ -1516,9 +1707,11 @@ function showAllocationReceipt(
 
 
       <p class="success-lead">
+
         Your accommodation has been successfully
         allocated. Please keep this information
         for your records.
+
       </p>
 
 
@@ -1549,7 +1742,9 @@ function showAllocationReceipt(
 
         <div class="ticket-student">
 
-          <span>STUDENT</span>
+          <span>
+            STUDENT
+          </span>
 
           <strong>
             ${escapeHtml(
@@ -1564,7 +1759,9 @@ function showAllocationReceipt(
 
           <div>
 
-            <span>BLOCK</span>
+            <span>
+              BLOCK
+            </span>
 
             <strong>
               ${escapeHtml(
@@ -1577,7 +1774,9 @@ function showAllocationReceipt(
 
           <div>
 
-            <span>ROOM</span>
+            <span>
+              ROOM
+            </span>
 
             <strong>
               ${escapeHtml(
@@ -1590,7 +1789,9 @@ function showAllocationReceipt(
 
           <div>
 
-            <span>BED</span>
+            <span>
+              BED
+            </span>
 
             <strong>
               ${escapeHtml(
@@ -1603,7 +1804,9 @@ function showAllocationReceipt(
 
           <div>
 
-            <span>ROOM CODE</span>
+            <span>
+              ROOM CODE
+            </span>
 
             <strong>
               ${escapeHtml(
@@ -1620,31 +1823,42 @@ function showAllocationReceipt(
 
       <div class="success-note">
 
-        <span>✓</span>
+        <span>
+          ✓
+        </span>
 
         <p>
+
           Your allocation is now recorded in the
           UHAS Asogli Hall accommodation system.
+
         </p>
 
       </div>
 
 
       <button
+        type="button"
         class="primary-action"
         id="printAllocation"
       >
+
         Print / Save allocation
-        <span aria-hidden="true">↗</span>
+
+        <span aria-hidden="true">
+          ↗
+        </span>
+
       </button>
 
     </div>
-
   `;
 
 
-  roomsSection.hidden =
-    true;
+  if (roomsSection) {
+    roomsSection.hidden =
+      true;
+  }
 
 
   const printButton =
@@ -1652,16 +1866,12 @@ function showAllocationReceipt(
       'printAllocation'
     );
 
-
   if (printButton) {
-
     printButton.addEventListener(
       'click',
       () => window.print()
     );
-
   }
-
 }
 
 
@@ -1670,42 +1880,46 @@ function showAllocationReceipt(
 // --------------------------------------------------
 
 async function loadExistingAllocation() {
-
   try {
-
     const {
       data,
       error
-    } = await supabase.functions.invoke(
-      'my-allocation'
-    );
-
+    } =
+      await supabase.functions.invoke(
+        'my-allocation'
+      );
 
     if (
       error ||
       !data?.allocation
     ) {
-
       return false;
-
     }
 
+    if (loginSection) {
+      loginSection.hidden =
+        true;
+    }
 
-    loginSection.hidden =
-      true;
+    if (genderSection) {
+      genderSection.hidden =
+        true;
+    }
 
-    genderSection.hidden =
-      true;
+    if (blockSection) {
+      blockSection.hidden =
+        true;
+    }
 
-    blockSection.hidden =
-      true;
+    if (roomsSection) {
+      roomsSection.hidden =
+        true;
+    }
 
-    roomsSection.hidden =
-      true;
-
-    allocationSection.hidden =
-      false;
-
+    if (allocationSection) {
+      allocationSection.hidden =
+        false;
+    }
 
     const allocation =
       data.allocation;
@@ -1718,7 +1932,6 @@ async function loadExistingAllocation() {
 
 
     allocationSection.innerHTML = `
-
       <div class="allocation-success">
 
         <div class="success-mark">
@@ -1737,8 +1950,10 @@ async function loadExistingAllocation() {
 
 
         <p class="success-lead">
+
           You already have a confirmed accommodation
           allocation.
+
         </p>
 
 
@@ -1769,7 +1984,9 @@ async function loadExistingAllocation() {
 
           <div class="ticket-student">
 
-            <span>STUDENT</span>
+            <span>
+              STUDENT
+            </span>
 
             <strong>
               ${escapeHtml(
@@ -1785,7 +2002,9 @@ async function loadExistingAllocation() {
 
             <div>
 
-              <span>BLOCK</span>
+              <span>
+                BLOCK
+              </span>
 
               <strong>
                 ${escapeHtml(
@@ -1798,7 +2017,9 @@ async function loadExistingAllocation() {
 
             <div>
 
-              <span>ROOM</span>
+              <span>
+                ROOM
+              </span>
 
               <strong>
                 ${escapeHtml(
@@ -1811,7 +2032,9 @@ async function loadExistingAllocation() {
 
             <div>
 
-              <span>BED</span>
+              <span>
+                BED
+              </span>
 
               <strong>
                 ${escapeHtml(
@@ -1824,7 +2047,9 @@ async function loadExistingAllocation() {
 
             <div>
 
-              <span>ROOM CODE</span>
+              <span>
+                ROOM CODE
+              </span>
 
               <strong>
                 ${escapeHtml(
@@ -1841,29 +2066,33 @@ async function loadExistingAllocation() {
 
         <div class="success-note">
 
-          <span>✓</span>
+          <span>
+            ✓
+          </span>
 
           <p>
+
             This allocation is already confirmed
             and cannot be booked again.
+
           </p>
 
         </div>
 
       </div>
-
     `;
 
 
     return true;
 
-
-  } catch {
+  } catch (error) {
+    console.error(
+      'Existing allocation check failed:',
+      error
+    );
 
     return false;
-
   }
-
 }
 
 
@@ -1872,87 +2101,84 @@ async function loadExistingAllocation() {
 // --------------------------------------------------
 
 if (loginButton) {
-
   loginButton.addEventListener(
     'click',
-    activateStudent
-  );
+    event => {
+      event.preventDefault();
 
+      activateStudent();
+    }
+  );
 }
 
 
 if (accessCodeInput) {
-
   accessCodeInput.addEventListener(
     'keydown',
     event => {
-
       if (
         event.key === 'Enter'
       ) {
+        event.preventDefault();
 
         activateStudent();
-
       }
-
     }
   );
-
 }
 
 
 if (indexInput) {
-
   indexInput.addEventListener(
     'keydown',
     event => {
-
       if (
         event.key === 'Enter'
       ) {
+        event.preventDefault();
 
         activateStudent();
-
       }
-
     }
   );
-
 }
+
 
 if (savePhoneButton) {
-
   savePhoneButton.addEventListener(
     'click',
-    savePhoneAndContinue
-  );
+    event => {
+      event.preventDefault();
 
+      savePhoneAndContinue();
+    }
+  );
 }
+
+
 document
   .querySelectorAll('.gender-choice')
   .forEach(button => {
-
     button.addEventListener(
       'click',
-      () => selectGender(
-        button.dataset.gender
-      )
+      () =>
+        selectGender(
+          button.dataset.gender
+        )
     );
-
   });
 
 
 document
   .querySelectorAll('.block-choice')
   .forEach(button => {
-
     button.addEventListener(
       'click',
-      () => selectBlock(
-        button.dataset.block
-      )
+      () =>
+        selectBlock(
+          button.dataset.block
+        )
     );
-
   });
 
 
@@ -1961,47 +2187,47 @@ document
 // --------------------------------------------------
 
 (async () => {
-
   try {
-
     applyBranding();
 
     createApplicationHeader();
 
     updateProgress(1);
 
-
     const {
       data: {
         session
       }
-    } = await supabase.auth.getSession();
-
+    } =
+      await supabase.auth.getSession();
 
     if (session) {
-
       const existingAllocation =
         await loadExistingAllocation();
 
-
       if (!existingAllocation) {
-
-        loginSection.hidden =
-          false;
-
+        if (loginSection) {
+          loginSection.hidden =
+            false;
+        }
       }
 
+    } else {
+      if (loginSection) {
+        loginSection.hidden =
+          false;
+      }
     }
 
-  } catch {
+  } catch (error) {
+    console.error(
+      'Application startup error:',
+      error
+    );
 
     if (loginSection) {
-
       loginSection.hidden =
         false;
-
     }
-
   }
-
 })();
