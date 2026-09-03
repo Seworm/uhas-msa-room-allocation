@@ -76,17 +76,27 @@ async function createPermanentStudentAccount(
   });
 
   if (createError || !created?.user) {
-    console.error(
-      'Permanent student Auth account creation failed:',
-      {
-        message: createError?.message,
-        code: createError?.code,
-        status: createError?.status,
-      }
-    );
+  console.error(
+    'Permanent student Auth account creation failed:',
+    {
+      message: createError?.message,
+      code: createError?.code,
+      status: createError?.status,
+    }
+  );
 
-    throw new Error('Unable to create student account');
-  }
+  return response(
+    {
+      error: 'Unable to create student account',
+      diagnostic: {
+        message: createError?.message ?? 'Unknown Auth error',
+        code: createError?.code ?? null,
+        status: createError?.status ?? null,
+      },
+    },
+    500
+  );
+}
 
   return created.user;
 }
