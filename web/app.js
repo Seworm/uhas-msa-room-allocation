@@ -560,193 +560,24 @@ async function savePhoneAndContinue() {
     savePhoneButton.disabled = false;
   }
 }
-// --------------------------------------------------
-// GENDER SELECTION
-// --------------------------------------------------
+currentStudent =
+  data.student;
 
-async function showGenderSelection() {
+showMessage(
+  `Welcome, ${data.student.student_name}.`
+);
 
-  updateProgress(2);
+loginSection.hidden = true;
 
-  genderMessage.textContent = '';
-  genderMessage.className = '';
+const alreadyAllocated =
+  await loadExistingAllocation();
 
-  showSection(genderSection);
-
-  try {
-
-    const phone =
-      await loadStudentPhone();
-
-    if (phoneNumberInput) {
-      phoneNumberInput.value = phone;
-    }
-
-    const gender =
-      normalizeGender(
-        currentStudent?.gender
-      );
-
-    /*
-      If gender has already been recorded,
-      do not ask the student to select it again.
-    */
-
-    if (
-      gender === 'MALE' ||
-      gender === 'FEMALE'
-    ) {
-
-      if (genderChoices) {
-        genderChoices.hidden = true;
-      }
-
-      if (savePhoneButton) {
-        savePhoneButton.hidden = false;
-      }
-
-    } else {
-
-      if (genderChoices) {
-        genderChoices.hidden = false;
-      }
-
-      if (savePhoneButton) {
-        savePhoneButton.hidden = true;
-      }
-
-    }
-
-  } catch (error) {
-
-    genderMessage.className =
-      'error';
-
-    genderMessage.textContent =
-      error.message ||
-      'Unable to load your profile.';
-
-  }
+if (alreadyAllocated) {
+  return;
 }
 
+showGenderSelection();
 
-aasync function selectGender(gender) {
-
-  const normalized =
-    normalizeGender(gender);
-
-  if (
-    normalized !== 'MALE' &&
-    normalized !== 'FEMALE'
-  ) {
-    return;
-  }
-
-  disableButtons(
-    '.gender-choice',
-    true
-  );
-
-  genderMessage.className = '';
-
-  genderMessage.textContent =
-    'Saving your phone number...';
-
-  try {
-
-    await saveStudentPhone();
-
-    genderMessage.textContent =
-      'Saving your gender selection...';
-
-    const {
-      data,
-      error
-    } = await supabase.rpc(
-      'set_student_gender',
-      {
-        p_gender: normalized
-      }
-    );
-
-    if (error) {
-      throw new Error(
-        error.message ||
-        'Unable to save gender selection.'
-      );
-    }
-
-    currentStudent.gender =
-      normalized;
-
-    genderMessage.className =
-      'success-message';
-
-    genderMessage.textContent =
-      'Profile saved securely.';
-
-    setTimeout(() => {
-      showBlockSelection();
-    }, 350);
-
-  } catch (error) {
-
-    genderMessage.className =
-      'error';
-
-    genderMessage.textContent =
-      error.message ||
-      'Unable to save your profile.';
-
-    disableButtons(
-      '.gender-choice',
-      false
-    );
-  }
-}
-async function savePhoneAndContinue() {
-
-  if (!savePhoneButton) {
-    return;
-  }
-
-  savePhoneButton.disabled = true;
-
-  genderMessage.className = '';
-
-  genderMessage.textContent =
-    'Saving your phone number...';
-
-  try {
-
-    await saveStudentPhone();
-
-    genderMessage.className =
-      'success-message';
-
-    genderMessage.textContent =
-      'Phone number saved securely.';
-
-    setTimeout(() => {
-
-      showBlockSelection();
-
-    }, 350);
-
-  } catch (error) {
-
-    genderMessage.className =
-      'error';
-
-    genderMessage.textContent =
-      error.message ||
-      'Unable to save your phone number.';
-
-    savePhoneButton.disabled = false;
-
-  }
-
-}
 
 // --------------------------------------------------
 // BLOCK SELECTION
