@@ -1,212 +1,200 @@
 BEGIN;
 
 -- ============================================================
--- ASOGLI HALL — RESET ALLOCATION CYCLE
--- ============================================================
--- Keeps the student master records and existing access-code
--- hashes, but makes every student eligible to activate/book again.
---
--- Also removes the erroneous Dome Room 0.
---
--- Expected final inventory:
---   160 rooms
---   640 beds
---   0 allocations
---   0 holds
---   640 available beds
+-- RESET ASOGLI HALL ALLOCATION CYCLE
 -- ============================================================
 
-
--- ------------------------------------------------------------
--- 1. Remove existing holds
--- ------------------------------------------------------------
+-- 1. Remove temporary holds.
 DELETE FROM public.holds;
 
 
--- ------------------------------------------------------------
--- 2. Remove existing allocations
--- ------------------------------------------------------------
+-- 2. Remove current allocations.
+--    Audit logs are intentionally preserved.
 DELETE FROM public.allocations;
 
 
--- ------------------------------------------------------------
--- 3. Reset all beds
--- ------------------------------------------------------------
+-- 3. Release all existing beds.
 UPDATE public.beds
 SET status = 'AVAILABLE';
 
 
--- ------------------------------------------------------------
--- 4. Reactivate existing access codes
+-- ============================================================
+-- REMOVE ERRONEOUS DOME-00
+-- ============================================================
 --
--- IMPORTANT:
--- Do NOT change access_code or access_code_hash.
--- Students will continue using the codes already issued to them.
--- ------------------------------------------------------------
-UPDATE public.students
-SET
-    auth_user_id = NULL,
-    access_code_used = FALSE,
-    activated_at = NULL,
-    updated_at = now();
+-- The beds table has an AFTER DELETE trigger that requires
+-- every room to have exactly four beds.
+--
+-- Deleting DOME-00's beds individually would therefore fail
+-- after the first deletion.
+--
+-- Temporarily disable ONLY that trigger while removing the
+-- invalid room, then re-enable it before validation/commit.
+-- ============================================================
+
+ALTER TABLE public.beds
+  DISABLE TRIGGER beds_must_total_four_per_room;
 
 
--- ------------------------------------------------------------
--- 5. Remove erroneous Dome Room 0
--- ------------------------------------------------------------
 DO $$
 DECLARE
-    v_room_id uuid;
-    v_room_count integer;
-    v_bed_count integer;
+  v_room_id UUID;
 BEGIN
 
-    SELECT count(*)
-    INTO v_room_count
-    FROM public.rooms
-    WHERE lower(block) = 'dome'
-      AND trim(room_number) = '0';
+  SELECT id
+  INTO v_room_id
+  FROM public.rooms
+  WHERE lower(trim(block)) = 'dome'
+    AND trim(room_number::text) = '0';
 
+  IF v_room_id IS NULL THEN
 
-    -- Nothing to remove.
-    IF v_room_count = 0 THEN
-        RAISE NOTICE 'Dome Room 0 not found. Continuing safely.';
-        RETURN;
-    END IF;
+    RAISE NOTICE 'DOME-00 not found; continuing.';
 
+  ELSE
 
-    -- Never silently choose between duplicate Room 0 records.
-    IF v_room_count > 1 THEN
-        RAISE EXCEPTION
-            'SAFETY STOP: More than one Dome Room 0 exists.';
-    END IF;
-
-
-    SELECT id
-    INTO v_room_id
-    FROM public.rooms
-    WHERE lower(block) = 'dome'
-      AND trim(room_number) = '0';
-
-
-    SELECT count(*)
-    INTO v_bed_count
-    FROM public.beds
-    WHERE room_id = v_room_id;
-
-
-    RAISE NOTICE
-        'Removing Dome Room 0 (% beds).',
-        v_bed_count;
-
-
-    -- Beds reference the room, so remove them first.
     DELETE FROM public.beds
     WHERE room_id = v_room_id;
-
 
     DELETE FROM public.rooms
     WHERE id = v_room_id;
 
+    RAISE NOTICE
+      'Removed erroneous DOME-00 room and its beds.';
+
+  END IF;
+
 END $$;
 
 
--- ------------------------------------------------------------
--- 6. HARD SAFETY CHECKS
--- ------------------------------------------------------------
+ALTER TABLE public.beds
+  ENABLE TRIGGER beds_must_total_four_per_room;
+
+
+-- ============================================================
+-- RESET STUDENT ACCESS ACTIVATION
+-- ============================================================
+
+UPDATE public.students
+SET
+  auth_user_id = NULL,
+  access_code_used = FALSE,
+  activated_at = NULL,
+  updated_at = now();
+
+
+-- ============================================================
+-- FINAL VALIDATION
+-- ============================================================
 
 DO $$
 DECLARE
-    v_rooms integer;
-    v_beds integer;
-    v_allocations integer;
-    v_holds integer;
-    v_available integer;
-    v_room_zero integer;
+  v_rooms INTEGER;
+  v_beds INTEGER;
+  v_allocations INTEGER;
+  v_holds INTEGER;
+  v_available INTEGER;
+  v_room_zero INTEGER;
+  v_bad_rooms INTEGER;
 BEGIN
 
-    SELECT count(*)
-    INTO v_rooms
-    FROM public.rooms;
+  SELECT COUNT(*)
+  INTO v_rooms
+  FROM public.rooms;
 
 
-    SELECT count(*)
-    INTO v_beds
-    FROM public.beds;
+  SELECT COUNT(*)
+  INTO v_beds
+  FROM public.beds;
 
 
-    SELECT count(*)
-    INTO v_allocations
-    FROM public.allocations;
+  SELECT COUNT(*)
+  INTO v_allocations
+  FROM public.allocations;
 
 
-    SELECT count(*)
-    INTO v_holds
-    FROM public.holds;
+  SELECT COUNT(*)
+  INTO v_holds
+  FROM public.holds;
 
 
-    SELECT count(*)
-    INTO v_available
-    FROM public.beds
-    WHERE status = 'AVAILABLE';
+  SELECT COUNT(*)
+  INTO v_available
+  FROM public.beds
+  WHERE status = 'AVAILABLE';
 
 
-    SELECT count(*)
-    INTO v_room_zero
-    FROM public.rooms
-    WHERE lower(block) = 'dome'
-      AND trim(room_number) = '0';
+  SELECT COUNT(*)
+  INTO v_room_zero
+  FROM public.rooms
+  WHERE lower(trim(block)) = 'dome'
+    AND trim(room_number::text) = '0';
 
 
-    IF v_rooms <> 160 THEN
-        RAISE EXCEPTION
-            'SAFETY CHECK FAILED: Expected 160 rooms, found %.',
-            v_rooms;
-    END IF;
+  SELECT COUNT(*)
+  INTO v_bad_rooms
+  FROM (
+    SELECT
+      r.id,
+      COUNT(b.id) AS bed_count
+    FROM public.rooms r
+    LEFT JOIN public.beds b
+      ON b.room_id = r.id
+    GROUP BY r.id
+    HAVING COUNT(b.id) <> 4
+  ) x;
 
 
-    IF v_beds <> 640 THEN
-        RAISE EXCEPTION
-            'SAFETY CHECK FAILED: Expected 640 beds, found %.',
-            v_beds;
-    END IF;
+  IF v_rooms <> 160 THEN
+    RAISE EXCEPTION
+      'Expected exactly 160 rooms, found %',
+      v_rooms;
+  END IF;
 
 
-    IF v_allocations <> 0 THEN
-        RAISE EXCEPTION
-            'SAFETY CHECK FAILED: Expected 0 allocations, found %.',
-            v_allocations;
-    END IF;
+  IF v_beds <> 640 THEN
+    RAISE EXCEPTION
+      'Expected exactly 640 beds, found %',
+      v_beds;
+  END IF;
 
 
-    IF v_holds <> 0 THEN
-        RAISE EXCEPTION
-            'SAFETY CHECK FAILED: Expected 0 holds, found %.',
-            v_holds;
-    END IF;
+  IF v_allocations <> 0 THEN
+    RAISE EXCEPTION
+      'Expected zero allocations, found %',
+      v_allocations;
+  END IF;
 
 
-    IF v_available <> 640 THEN
-        RAISE EXCEPTION
-            'SAFETY CHECK FAILED: Expected 640 available beds, found %.',
-            v_available;
-    END IF;
+  IF v_holds <> 0 THEN
+    RAISE EXCEPTION
+      'Expected zero holds, found %',
+      v_holds;
+  END IF;
 
 
-    IF v_room_zero <> 0 THEN
-        RAISE EXCEPTION
-            'SAFETY CHECK FAILED: Dome Room 0 still exists.';
-    END IF;
+  IF v_available <> 640 THEN
+    RAISE EXCEPTION
+      'Expected 640 available beds, found %',
+      v_available;
+  END IF;
 
 
-    RAISE NOTICE '========================================';
-    RAISE NOTICE 'ASOGLI HALL ALLOCATION RESET SUCCESSFUL';
-    RAISE NOTICE 'Rooms:       %', v_rooms;
-    RAISE NOTICE 'Beds:        %', v_beds;
-    RAISE NOTICE 'Available:   %', v_available;
-    RAISE NOTICE 'Allocations: %', v_allocations;
-    RAISE NOTICE 'Holds:       %', v_holds;
-    RAISE NOTICE '========================================';
+  IF v_room_zero <> 0 THEN
+    RAISE EXCEPTION
+      'DOME-00 still exists.';
+  END IF;
+
+
+  IF v_bad_rooms <> 0 THEN
+    RAISE EXCEPTION
+      'Found % rooms that do not have exactly four beds.',
+      v_bad_rooms;
+  END IF;
+
+
+  RAISE NOTICE
+    'Allocation cycle reset successfully: 160 rooms, 640 beds, 0 allocations, 0 holds.';
 
 END $$;
 
