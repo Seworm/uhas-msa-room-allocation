@@ -1,13 +1,17 @@
-project_id = "gepwifrsudifmcjfeugs"
+[functions.student-login]
+verify_jwt = false
 
 [functions.rooms]
-verify_jwt = true
+verify_jwt = false
 
 [functions.allocate-room]
-verify_jwt = true
+verify_jwt = false
 
 [functions.my-allocation]
-verify_jwt = true
+verify_jwt = false
 
-[functions.student-login]
-verify_jwt = true
+[functions.get-student-phone]
+verify_jwt = false
+
+[functions.update-student-phone]
+verify_jwt = false
