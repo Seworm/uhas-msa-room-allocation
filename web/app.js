@@ -77,127 +77,111 @@ const changeBlockButton =
 // --------------------------------------------------
 
 let currentStudent = null;
-
 let currentAllocation = null;
-
 let currentPortalData = null;
-
 let selectedBlock = null;
-
 let currentHold = null;
-
 let holdTimer = null;
-
 let portalTab = 'room';
 
 
 // --------------------------------------------------
-// STUDENT SESSION
-// --------------------------------------------------
-//
-// Multi-device architecture:
-// Each browser/device stores its own student session token.
-//
-// The token must be issued by student-login.
-// It must NOT be tied to the anonymous Supabase Auth UID.
-//
+// STUDENT LOGOUT MARKER
 // --------------------------------------------------
 
-const STUDENT_SESSION_KEY =
-  'uhas_student_session_token';
-
-const STUDENT_LOGOUT_KEY =
-  'uhas_student_logged_out';
-
-
-function getStudentSessionToken() {
-  return sessionStorage.getItem(
-    STUDENT_SESSION_KEY
-  );
-}
-
-
-function setStudentSessionToken(token) {
-  if (!token) {
-    sessionStorage.removeItem(
-      STUDENT_SESSION_KEY
-    );
-
-    return;
-  }
-
-  sessionStorage.setItem(
-    STUDENT_SESSION_KEY,
-    token
-  );
-}
-
-
-function clearStudentSessionToken() {
-  sessionStorage.removeItem(
-    STUDENT_SESSION_KEY
-  );
-}
+const LOGOUT_MARKER =
+  'uhas_asogli_student_logged_out';
 
 
 function markStudentLoggedOut() {
-  sessionStorage.setItem(
-    STUDENT_LOGOUT_KEY,
-    '1'
-  );
+  try {
+    sessionStorage.setItem(
+      LOGOUT_MARKER,
+      'true'
+    );
+  } catch (error) {
+    console.warn(
+      'Unable to save logout marker:',
+      error
+    );
+  }
 }
 
 
-function clearStudentLoggedOut() {
-  sessionStorage.removeItem(
-    STUDENT_LOGOUT_KEY
-  );
+function clearStudentLoggedOutMarker() {
+  try {
+    sessionStorage.removeItem(
+      LOGOUT_MARKER
+    );
+  } catch (error) {
+    console.warn(
+      'Unable to clear logout marker:',
+      error
+    );
+  }
 }
 
 
 function wasStudentLoggedOut() {
-  return (
-    sessionStorage.getItem(
-      STUDENT_LOGOUT_KEY
-    ) === '1'
-  );
+  try {
+    return (
+      sessionStorage.getItem(
+        LOGOUT_MARKER
+      ) === 'true'
+    );
+  } catch (error) {
+    return false;
+  }
 }
 
 
 // --------------------------------------------------
 // SUPABASE INVOKE HELPER
 // --------------------------------------------------
-//
-// If student-login returns a student session token,
-// all protected student functions receive it here.
-//
-// The fallback to the Supabase session is retained
-// for compatibility with the current backend while
-// the multi-device backend is being deployed.
-//
-// --------------------------------------------------
 
 async function invokeStudentFunction(
   functionName,
   options = {}
 ) {
-  const headers = {
-    ...(options.headers || {})
-  };
+  const {
+    data: sessionData,
+    error: sessionError
+  } = await supabase.auth.getSession();
 
-  const studentToken =
-    getStudentSessionToken();
+  if (sessionError) {
+    console.error(
+      'Unable to obtain Supabase session:',
+      sessionError
+    );
 
-  if (studentToken) {
-    headers.Authorization =
-      `Bearer ${studentToken}`;
+    throw new Error(
+      'Unable to verify your login session. Please sign in again.'
+    );
   }
+
+  const session =
+    sessionData?.session;
+
+  if (!session?.access_token) {
+    throw new Error(
+      'Your session has expired. Please sign in again.'
+    );
+  }
+
+  const existingHeaders =
+    options.headers || {};
 
   return supabase.functions.invoke(
     functionName,
     {
       ...options,
-      headers
+
+      headers: {
+        ...existingHeaders,
+
+        Authorization:
+          `Bearer ${session.access_token}`
+      }
     }
   );
 }
@@ -316,8 +300,10 @@ function setLoading(
   }
 
   if (loading) {
-    button.dataset.originalText =
-      button.textContent;
+    if (!button.dataset.originalText) {
+      button.dataset.originalText =
+        button.textContent;
+    }
 
     button.disabled =
       true;
@@ -331,7 +317,41 @@ function setLoading(
     button.textContent =
       button.dataset.originalText ||
       button.textContent;
+
+    delete button.dataset.originalText;
   }
+}
+
+
+function getFunctionErrorMessage(
+  error,
+  fallback
+) {
+  if (!error) {
+    return fallback;
+  }
+
+  const message =
+    String(
+      error.message ||
+      error.error ||
+      ''
+    ).trim();
+
+  if (
+    message &&
+    !message.toLowerCase().includes(
+      'failed to send a request'
+    )
+  ) {
+    return message;
+  }
+
+  return (
+    'Unable to contact the accommodation server. ' +
+    'Please refresh the page and try again. ' +
+    'If the problem continues, contact the accommodation administrator.'
+  );
 }
 
 
@@ -438,101 +458,66 @@ function updateProgress(step) {
 
 
 // --------------------------------------------------
-// SUPABASE SESSION
-// --------------------------------------------------
-//
-// This remains for compatibility with the current
-// anonymous-session implementation.
-//
-// The permanent student identity should NOT depend
-// on this anonymous UID once the multi-device backend
-// is deployed.
-// --------------------------------------------------
-
-async function ensureSession() {
-  const {
-    data: {
-      session
-    }
-  } =
-    await supabase.auth.getSession();
-
-  if (session) {
-    return session;
-  }
-
-  const {
-    data,
-    error
-  } =
-    await supabase.auth.signInAnonymously();
-
-  if (
-    error ||
-    !data?.session
-  ) {
-    throw new Error(
-      'Unable to start a secure session. Please try again.'
-    );
-  }
-
-  return data.session;
-}
-
-
-// --------------------------------------------------
 // LOGIN
 // --------------------------------------------------
 
 async function activateStudent() {
-  if (
-    !indexInput ||
-    !accessCodeInput
-  ) {
+  const index =
+    String(
+      indexInput?.value || ''
+    )
+      .trim()
+      .toUpperCase();
+
+  const accessCode =
+    String(
+      accessCodeInput?.value || ''
+    )
+      .trim();
+
+  if (!index) {
     showMessage(
-      'Login form is unavailable.',
+      'Enter your index number.',
       'error'
     );
 
+    indexInput?.focus();
     return;
   }
 
-  const studentId =
-    indexInput.value.trim();
-
-  const accessCode =
-    accessCodeInput.value.trim();
-
-  if (
-    !studentId ||
-    !accessCode
-  ) {
+  if (!accessCode) {
     showMessage(
-      'Enter your index number and access code.',
+      'Enter your access code.',
       'error'
     );
 
+    accessCodeInput?.focus();
     return;
   }
 
   setLoading(
     loginButton,
     true,
-    'Verifying...'
+    'Signing in...'
   );
 
   showMessage(
-    'Securely verifying your accommodation access...'
+    'Verifying your student account...'
   );
 
   try {
-    clearStudentLoggedOut();
+    clearStudentLoggedOutMarker();
 
-    /*
-     * Anonymous Supabase session is retained only
-     * for compatibility with the current backend.
-     */
-    await ensureSession();
+    // ------------------------------------------------
+    // The login function is intentionally called
+    // without an Authorization header.
+    //
+    // It is the public entry point that verifies:
+    //
+    //   index number + access code
+    //
+    // and returns a real Supabase Auth session.
+    // ------------------------------------------------
 
     const {
       data,
@@ -542,11 +527,13 @@ async function activateStudent() {
         'student-login',
         {
           body: {
-            student_id:
-              studentId,
+            index_number: index,
+            access_code: accessCode,
 
-            access_code:
-              accessCode
+            // Included for compatibility if the
+            // backend currently uses p_* names.
+            p_index_number: index,
+            p_access_code: accessCode
           }
         }
       );
@@ -560,68 +547,210 @@ async function activateStudent() {
     );
 
     if (error) {
+      console.error(
+        'student-login error:',
+        error
+      );
+
       throw new Error(
-        error.message ||
-        'Unable to verify your login.'
+        getFunctionErrorMessage(
+          error,
+          'Unable to sign in.'
+        )
       );
     }
+
+    if (!data) {
+      throw new Error(
+        'The login server returned an empty response.'
+      );
+    }
+
+    if (data.error) {
+      throw new Error(
+        typeof data.error === 'string'
+          ? data.error
+          : JSON.stringify(data.error)
+      );
+    }
+
+    const accessToken =
+      data.access_token;
+
+    const refreshToken =
+      data.refresh_token;
 
     if (
-      !data?.success ||
-      !data?.student
+      !accessToken ||
+      !refreshToken
     ) {
+      console.error(
+        'Invalid student-login response:',
+        data
+      );
+
       throw new Error(
-        data?.error ||
-        'Invalid index number or access code.'
+        'The student account was verified, but the login session could not be created.'
       );
     }
 
-    /*
-     * Multi-device support:
-     *
-     * The backend should return a token such as:
-     *
-     * data.session_token
-     *
-     * This token belongs to the student rather than
-     * the anonymous Supabase browser account.
-     */
-    if (data.session_token) {
-      setStudentSessionToken(
-        data.session_token
+    // ------------------------------------------------
+    // Install the REAL Supabase Auth session.
+    // ------------------------------------------------
+
+    const {
+      data: sessionData,
+      error: sessionError
+    } =
+      await supabase.auth.setSession({
+        access_token:
+          accessToken,
+
+        refresh_token:
+          refreshToken
+      });
+
+    if (sessionError) {
+      console.error(
+        'setSession failed:',
+        sessionError
+      );
+
+      throw new Error(
+        'Your account was verified, but your secure session could not be established.'
       );
     }
 
-    currentStudent =
-      data.student;
+    if (!sessionData?.session) {
+      throw new Error(
+        'Your secure login session could not be established.'
+      );
+    }
 
-    showMessage(
-      `Welcome, ${data.student.student_name}.`
-    );
+    // ------------------------------------------------
+    // Obtain authoritative student information.
+    // ------------------------------------------------
+
+    let portalData = null;
+
+    try {
+      const {
+        data: allocationData,
+        error: allocationError
+      } =
+        await invokeStudentFunction(
+          'my-allocation'
+        );
+
+      if (
+        !allocationError &&
+        allocationData?.student
+      ) {
+        portalData =
+          allocationData;
+      }
+    } catch (error) {
+      console.warn(
+        'Initial my-allocation check failed:',
+        error
+      );
+    }
+
+    // ------------------------------------------------
+    // If the student already has an allocation,
+    // immediately open the portal.
+    // ------------------------------------------------
+
+    if (
+      portalData?.allocation
+    ) {
+      currentStudent =
+        portalData.student;
+
+      currentPortalData =
+        portalData;
+
+      currentAllocation =
+        portalData.allocation;
+
+      if (
+        !Array.isArray(
+          currentPortalData.roommates
+        )
+      ) {
+        currentPortalData.roommates =
+          [];
+      }
+
+      if (loginSection) {
+        loginSection.hidden =
+          true;
+      }
+
+      renderStudentPortal();
+
+      showMessage('');
+
+      return;
+    }
+
+    // ------------------------------------------------
+    // No existing allocation.
+    //
+    // We still need authoritative student data.
+    // ------------------------------------------------
+
+    if (
+      portalData?.student
+    ) {
+      currentStudent =
+        portalData.student;
+
+      currentPortalData =
+        portalData;
+    } else {
+      // The student-login response may optionally
+      // contain the student record.
+      if (data.student) {
+        currentStudent =
+          data.student;
+      } else {
+        currentStudent = null;
+      }
+    }
 
     if (loginSection) {
       loginSection.hidden =
         true;
     }
 
-    const alreadyAllocated =
-      await loadExistingAllocation();
-
-    if (alreadyAllocated) {
-      return;
-    }
+    showMessage('');
 
     await showGenderSelection();
 
   } catch (error) {
     console.error(
-      'Student login error:',
+      'Student login failed:',
       error
     );
 
+    // Never leave a half-created session active.
+    try {
+      await supabase.auth.signOut();
+    } catch (signOutError) {
+      console.warn(
+        'Unable to clear failed login session:',
+        signOutError
+      );
+    }
+
+    currentStudent = null;
+    currentAllocation = null;
+    currentPortalData = null;
+
     showMessage(
       error?.message ||
-      'Unable to sign in.',
+      'Unable to sign in. Please check your index number and access code.',
       'error'
     );
 
@@ -639,26 +768,39 @@ async function activateStudent() {
 // --------------------------------------------------
 
 async function loadStudentPhone() {
-  const {
-    data,
-    error
-  } =
-    await invokeStudentFunction(
-      'get-student-phone'
-    );
+  try {
+    const {
+      data,
+      error
+    } =
+      await invokeStudentFunction(
+        'get-student-phone'
+      );
 
-  if (error) {
+    if (error) {
+      console.error(
+        'get-student-phone error:',
+        error
+      );
+
+      throw new Error(
+        getFunctionErrorMessage(
+          error,
+          'Unable to load your phone number.'
+        )
+      );
+    }
+
+    return data || '';
+
+  } catch (error) {
     console.error(
-      'get_student_phone error:',
+      'loadStudentPhone error:',
       error
     );
 
-    throw new Error(
-      'Unable to load your phone number. Please contact the accommodation administrator.'
-    );
+    throw error;
   }
-
-  return data || '';
 }
 
 
@@ -695,24 +837,34 @@ async function saveStudentPhone() {
 
   if (error) {
     console.error(
-      'update_student_phone error:',
+      'update-student-phone error:',
       error
     );
 
     throw new Error(
-      error.message ||
-      'Unable to save your phone number.'
+      getFunctionErrorMessage(
+        error,
+        'Unable to save your phone number.'
+      )
+    );
+  }
+
+  if (
+    data?.error
+  ) {
+    throw new Error(
+      typeof data.error === 'string'
+        ? data.error
+        : JSON.stringify(data.error)
     );
   }
 
   if (currentStudent) {
     currentStudent.phone_number =
-      data ||
-      phone;
+      data || phone;
   }
 
-  return data ||
-    phone;
+  return data || phone;
 }
 
 
@@ -728,11 +880,8 @@ async function showGenderSelection() {
   );
 
   if (genderMessage) {
-    genderMessage.className =
-      '';
-
-    genderMessage.textContent =
-      '';
+    genderMessage.className = '';
+    genderMessage.textContent = '';
   }
 
   if (!phoneNumberInput) {
@@ -752,8 +901,7 @@ async function showGenderSelection() {
       await loadStudentPhone();
 
     phoneNumberInput.value =
-      existingPhone ||
-      '';
+      existingPhone || '';
 
   } catch (error) {
     console.error(
@@ -766,7 +914,8 @@ async function showGenderSelection() {
         'error';
 
       genderMessage.textContent =
-        error.message;
+        error.message ||
+        'Unable to load your phone number.';
     }
 
     return;
@@ -777,13 +926,9 @@ async function showGenderSelection() {
       currentStudent?.gender
     );
 
-  /*
-   * If the student already has a gender,
-   * don't ask them to select it again.
-   *
-   * They only need to confirm/save
-   * their phone number.
-   */
+  // ------------------------------------------------
+  // Existing gender
+  // ------------------------------------------------
 
   if (
     gender === 'MALE' ||
@@ -807,10 +952,9 @@ async function showGenderSelection() {
     return;
   }
 
-  /*
-   * No gender yet.
-   * Show the gender choices.
-   */
+  // ------------------------------------------------
+  // No gender yet
+  // ------------------------------------------------
 
   if (genderChoices) {
     genderChoices.hidden =
@@ -845,8 +989,7 @@ async function savePhoneAndContinue() {
   );
 
   if (genderMessage) {
-    genderMessage.className =
-      '';
+    genderMessage.className = '';
 
     genderMessage.textContent =
       'Saving your phone number securely...';
@@ -868,6 +1011,11 @@ async function savePhoneAndContinue() {
     }, 350);
 
   } catch (error) {
+    console.error(
+      'Saving phone failed:',
+      error
+    );
+
     if (genderMessage) {
       genderMessage.className =
         'error';
@@ -911,22 +1059,23 @@ async function selectGender(gender) {
   });
 
   if (genderMessage) {
-    genderMessage.className =
-      '';
+    genderMessage.className = '';
 
     genderMessage.textContent =
       'Saving your details securely...';
   }
 
   try {
-    /*
-     * Phone number must be saved first.
-     */
+    // ------------------------------------------------
+    // Phone must be saved first.
+    // ------------------------------------------------
+
     await saveStudentPhone();
 
-    /*
-     * Save gender through existing RPC.
-     */
+    // ------------------------------------------------
+    // Save gender.
+    // ------------------------------------------------
+
     const {
       data,
       error
@@ -940,15 +1089,27 @@ async function selectGender(gender) {
       );
 
     if (error) {
+      console.error(
+        'set_student_gender error:',
+        error
+      );
+
       throw new Error(
         error.message ||
         'Unable to save your gender.'
       );
     }
 
-    /*
-     * Update local student state.
-     */
+    if (
+      data?.error
+    ) {
+      throw new Error(
+        typeof data.error === 'string'
+          ? data.error
+          : JSON.stringify(data.error)
+      );
+    }
+
     if (currentStudent) {
       currentStudent.gender =
         data ||
@@ -1094,14 +1255,18 @@ async function loadRooms(
 
     if (error) {
       throw new Error(
-        error.message ||
-        'Unable to load rooms.'
+        getFunctionErrorMessage(
+          error,
+          'Unable to load rooms.'
+        )
       );
     }
 
     if (data?.error) {
       throw new Error(
-        data.error
+        typeof data.error === 'string'
+          ? data.error
+          : JSON.stringify(data.error)
       );
     }
 
@@ -1151,242 +1316,245 @@ async function loadRooms(
     }
 
     grid.innerHTML =
-      rooms.map(room => {
-        const availableBeds =
-          Number(
-            room.available_beds ??
-            0
-          );
+      rooms
+        .map(room => {
+          const availableBeds =
+            Number(
+              room.available_beds ??
+              0
+            );
 
-        const occupiedBeds =
-          Number(
-            room.occupied_beds ??
-            0
-          );
+          const occupiedBeds =
+            Number(
+              room.occupied_beds ??
+              0
+            );
 
-        const capacity =
-          Number(
-            room.capacity ??
-            4
-          );
+          const capacity =
+            Number(
+              room.capacity ??
+              4
+            );
 
-        const roomGender =
-          normalizeGender(
-            room.gender
-          );
+          const roomGender =
+            normalizeGender(
+              room.gender
+            );
 
-        let genderLabel =
-          'Gender not established';
+          let genderLabel =
+            'Gender not established';
 
-        let genderClass =
-          'neutral';
+          let genderClass =
+            'neutral';
 
-        if (
-          roomGender === 'MALE'
-        ) {
-          genderLabel =
-            'Male room';
+          if (
+            roomGender === 'MALE'
+          ) {
+            genderLabel =
+              'Male room';
 
-          genderClass =
-            'male';
+            genderClass =
+              'male';
 
-        } else if (
-          roomGender === 'FEMALE'
-        ) {
-          genderLabel =
-            'Female room';
+          } else if (
+            roomGender === 'FEMALE'
+          ) {
+            genderLabel =
+              'Female room';
 
-          genderClass =
-            'female';
-        }
+            genderClass =
+              'female';
+          }
 
-        /*
-         * Dome rooms 31–40 are permanently
-         * male-only.
-         */
-        const isDomeMaleOnly =
-          room.block === 'Dome' &&
-          /^(3[1-9]|40)$/.test(
-            String(
-              room.room_number
-            )
-          );
+          // ------------------------------------------
+          // Dome rooms 31–40 are permanently male-only.
+          // ------------------------------------------
 
-        if (isDomeMaleOnly) {
-          genderLabel =
-            'Male only';
-
-          genderClass =
-            'male-only';
-        }
-
-        const occupancyPercent =
-          capacity > 0
-            ? Math.min(
-                100,
-                Math.round(
-                  (
-                    occupiedBeds /
-                    capacity
-                  ) * 100
-                )
+          const isDomeMaleOnly =
+            room.block === 'Dome' &&
+            /^(3[1-9]|40)$/.test(
+              String(
+                room.room_number
               )
-            : 0;
+            );
 
-        const bedVisual =
-          Array.from(
-            {
-              length:
-                capacity
-            },
-            (_, index) => {
-              const occupied =
-                index <
-                occupiedBeds;
+          if (isDomeMaleOnly) {
+            genderLabel =
+              'Male only';
 
-              return `
-                <span
-                  class="bed-indicator ${
-                    occupied
-                      ? 'occupied'
-                      : 'available'
-                  }"
-                  title="${
-                    occupied
-                      ? 'Occupied'
-                      : 'Available'
-                  }"
-                >
-                  ${
-                    occupied
-                      ? '●'
-                      : '○'
-                  }
-                </span>
-              `;
-            }
-          ).join('');
+            genderClass =
+              'male-only';
+          }
 
-        return `
-          <article
-            class="room-card modern-room-card"
-          >
+          const occupancyPercent =
+            capacity > 0
+              ? Math.min(
+                  100,
+                  Math.round(
+                    (
+                      occupiedBeds /
+                      capacity
+                    ) * 100
+                  )
+                )
+              : 0;
 
-            <div class="room-card-top">
+          const bedVisual =
+            Array.from(
+              {
+                length:
+                  capacity
+              },
+              (_, index) => {
+                const occupied =
+                  index <
+                  occupiedBeds;
 
-              <span class="room-block-label">
-                ${escapeHtml(
-                  room.block
-                )}
-              </span>
-
-              <span
-                class="gender-badge ${genderClass}"
-              >
-                ${escapeHtml(
-                  genderLabel
-                )}
-              </span>
-
-            </div>
-
-            <div class="room-card-header">
-
-              <div>
-
-                <h3>
-                  ${escapeHtml(
-                    room.room_code
-                  )}
-                </h3>
-
-                <p class="room-location">
-                  Floor
-                  ${escapeHtml(
-                    room.floor
-                  )}
-                  · Room
-                  ${escapeHtml(
-                    room.room_number
-                  )}
-                </p>
-
-              </div>
-
-            </div>
-
-            <div class="room-visual">
-
-              <div class="bed-indicators">
-                ${bedVisual}
-              </div>
-
-              <span class="occupancy-percent">
-                ${occupancyPercent}%
-              </span>
-
-            </div>
-
-            <div class="room-capacity">
-
-              <div>
-
-                <strong>
-                  ${availableBeds}
-                </strong>
-
-                <span>
-                  ${
-                    availableBeds === 1
-                      ? 'bed'
-                      : 'beds'
-                  }
-                  available
-                </span>
-
-              </div>
-
-              <div class="capacity-text">
-                ${occupiedBeds}/${capacity}
-                occupied
-              </div>
-
-            </div>
-
-            <div class="occupancy-bar">
-
-              <span
-                style="width:${occupancyPercent}%"
-              ></span>
-
-            </div>
-
-            <button
-              type="button"
-              class="select-room modern-select-room"
-              data-room-id="${escapeHtml(
-                room.id
-              )}"
-              ${
-                availableBeds <= 0
-                  ? 'disabled'
-                  : ''
+                return `
+                  <span
+                    class="bed-indicator ${
+                      occupied
+                        ? 'occupied'
+                        : 'available'
+                    }"
+                    title="${
+                      occupied
+                        ? 'Occupied'
+                        : 'Available'
+                    }"
+                  >
+                    ${
+                      occupied
+                        ? '●'
+                        : '○'
+                    }
+                  </span>
+                `;
               }
+            )
+            .join('');
+
+          return `
+            <article
+              class="room-card modern-room-card"
             >
 
-              <span>
-                Select this room
-              </span>
+              <div class="room-card-top">
 
-              <span aria-hidden="true">
-                →
-              </span>
+                <span class="room-block-label">
+                  ${escapeHtml(
+                    room.block
+                  )}
+                </span>
 
-            </button>
+                <span
+                  class="gender-badge ${genderClass}"
+                >
+                  ${escapeHtml(
+                    genderLabel
+                  )}
+                </span>
 
-          </article>
-        `;
-      }).join('');
+              </div>
+
+              <div class="room-card-header">
+
+                <div>
+
+                  <h3>
+                    ${escapeHtml(
+                      room.room_code
+                    )}
+                  </h3>
+
+                  <p class="room-location">
+                    Floor
+                    ${escapeHtml(
+                      room.floor
+                    )}
+                    · Room
+                    ${escapeHtml(
+                      room.room_number
+                    )}
+                  </p>
+
+                </div>
+
+              </div>
+
+              <div class="room-visual">
+
+                <div class="bed-indicators">
+                  ${bedVisual}
+                </div>
+
+                <span class="occupancy-percent">
+                  ${occupancyPercent}%
+                </span>
+
+              </div>
+
+              <div class="room-capacity">
+
+                <div>
+
+                  <strong>
+                    ${availableBeds}
+                  </strong>
+
+                  <span>
+                    ${
+                      availableBeds === 1
+                        ? 'bed'
+                        : 'beds'
+                    }
+                    available
+                  </span>
+
+                </div>
+
+                <div class="capacity-text">
+                  ${occupiedBeds}/${capacity}
+                  occupied
+                </div>
+
+              </div>
+
+              <div class="occupancy-bar">
+
+                <span
+                  style="width:${occupancyPercent}%"
+                ></span>
+
+              </div>
+
+              <button
+                type="button"
+                class="select-room modern-select-room"
+                data-room-id="${escapeHtml(
+                  room.id
+                )}"
+                ${
+                  availableBeds <= 0
+                    ? 'disabled'
+                    : ''
+                }
+              >
+
+                <span>
+                  Select this room
+                </span>
+
+                <span aria-hidden="true">
+                  →
+                </span>
+
+              </button>
+
+            </article>
+          `;
+        })
+        .join('');
 
     document
       .querySelectorAll(
@@ -1456,18 +1624,6 @@ async function loadRooms(
 
 
 // --------------------------------------------------
-// CHANGE BLOCK
-// --------------------------------------------------
-
-if (changeBlockButton) {
-  changeBlockButton.addEventListener(
-    'click',
-    showBlockSelection
-  );
-}
-
-
-// --------------------------------------------------
 // ROOM HOLD
 // --------------------------------------------------
 
@@ -1481,12 +1637,7 @@ async function holdRoom(roomId) {
     true
   );
 
-  let holdData =
-    null;
-
-  /*
-   * CREATE THE HOLD
-   */
+  let holdData = null;
 
   try {
     const {
@@ -1497,11 +1648,8 @@ async function holdRoom(roomId) {
         'allocate-room',
         {
           body: {
-            action:
-              'hold',
-
-            room_id:
-              roomId
+            action: 'hold',
+            room_id: roomId
           }
         }
       );
@@ -1521,8 +1669,10 @@ async function holdRoom(roomId) {
       );
 
       throw new Error(
-        error.message ||
-        'Unable to reserve this room.'
+        getFunctionErrorMessage(
+          error,
+          'Unable to reserve this room.'
+        )
       );
     }
 
@@ -1536,9 +1686,7 @@ async function holdRoom(roomId) {
       throw new Error(
         typeof data.error === 'string'
           ? data.error
-          : JSON.stringify(
-              data.error
-            )
+          : JSON.stringify(data.error)
       );
     }
 
@@ -1576,10 +1724,6 @@ async function holdRoom(roomId) {
 
     return;
   }
-
-  /*
-   * DISPLAY HOLD SCREEN
-   */
 
   try {
     console.log(
@@ -1631,11 +1775,8 @@ function showHoldConfirmation(
     <div class="reservation-shell">
 
       <div class="reservation-status">
-
         <span class="status-dot"></span>
-
         Room temporarily reserved
-
       </div>
 
       <div class="reservation-heading">
@@ -1827,6 +1968,23 @@ function startHoldCountdown(
       hold.expires_at
     ).getTime();
 
+  if (!Number.isFinite(
+    expiresAt
+  )) {
+    countdown.textContent =
+      'Unavailable';
+
+    if (holdMessage) {
+      holdMessage.className =
+        'hold-message error';
+
+      holdMessage.textContent =
+        'The reservation expiry time could not be determined. Please refresh the page.';
+    }
+
+    return;
+  }
+
   function updateCountdown() {
     const remaining =
       expiresAt -
@@ -1939,11 +2097,8 @@ async function confirmAllocation(
         'allocate-room',
         {
           body: {
-            action:
-              'confirm',
-
-            hold_id:
-              holdId
+            action: 'confirm',
+            hold_id: holdId
           }
         }
       );
@@ -1956,16 +2111,12 @@ async function confirmAllocation(
       }
     );
 
-    /*
-     * IMPORTANT:
-     * Check errors BEFORE treating the operation
-     * as successful.
-     */
-
     if (error) {
       throw new Error(
-        error.message ||
-        'Unable to confirm your allocation.'
+        getFunctionErrorMessage(
+          error,
+          'Unable to confirm your allocation.'
+        )
       );
     }
 
@@ -1979,25 +2130,14 @@ async function confirmAllocation(
       throw new Error(
         typeof data.error === 'string'
           ? data.error
-          : JSON.stringify(
-              data.error
-            )
+          : JSON.stringify(data.error)
       );
     }
-
-    /*
-     * Confirmation succeeded.
-     */
 
     stopHoldTimer();
 
     currentHold =
       null;
-
-    /*
-     * Refresh the authoritative allocation
-     * directly from the backend.
-     */
 
     const portalLoaded =
       await loadStudentPortal();
@@ -2215,8 +2355,7 @@ function showAllocationReceipt(
   if (printButton) {
     printButton.addEventListener(
       'click',
-      () =>
-        window.print()
+      () => window.print()
     );
   }
 
@@ -2268,6 +2407,10 @@ async function loadStudentPortal() {
     }
 
     if (!data?.student) {
+      console.error(
+        'my-allocation returned no student.'
+      );
+
       return false;
     }
 
@@ -2276,6 +2419,13 @@ async function loadStudentPortal() {
 
     currentPortalData =
       data;
+
+    if (!Array.isArray(
+      currentPortalData.roommates
+    )) {
+      currentPortalData.roommates =
+        [];
+    }
 
     if (!data.allocation) {
       currentAllocation =
@@ -2286,27 +2436,6 @@ async function loadStudentPortal() {
 
     currentAllocation =
       data.allocation;
-
-    /*
-     * The backend returns roommates separately:
-     *
-     * {
-     *   student,
-     *   allocation,
-     *   roommates
-     * }
-     *
-     * Keep the data together for portal rendering.
-     */
-
-    if (
-      !Array.isArray(
-        currentPortalData.roommates
-      )
-    ) {
-      currentPortalData.roommates =
-        [];
-    }
 
     if (loginSection) {
       loginSection.hidden =
@@ -2485,8 +2614,7 @@ function renderStudentPortal() {
   if (printButton) {
     printButton.addEventListener(
       'click',
-      () =>
-        window.print()
+      () => window.print()
     );
   }
 }
@@ -2672,15 +2800,6 @@ function renderMyRoomTab() {
 // --------------------------------------------------
 
 function renderRoommatesTab() {
-  /*
-   * IMPORTANT:
-   * roommates come from my-allocation as:
-   *
-   * data.roommates
-   *
-   * NOT currentAllocation.roommates.
-   */
-
   const roommates =
     Array.isArray(
       currentPortalData?.roommates
@@ -3019,40 +3138,34 @@ async function logoutStudent() {
 
   stopHoldTimer();
 
-  currentStudent =
-    null;
-
-  currentAllocation =
-    null;
-
-  currentPortalData =
-    null;
-
-  currentHold =
-    null;
-
-  selectedBlock =
-    null;
-
-  portalTab =
-    'room';
-
-  /*
-   * Remove this browser's student session.
-   *
-   * This does NOT affect the student's ability
-   * to log in on another device.
-   */
-
-  clearStudentSessionToken();
-
-  /*
-   * Remember that this browser was explicitly
-   * logged out so startup doesn't immediately
-   * restore a portal.
-   */
+  currentStudent = null;
+  currentAllocation = null;
+  currentPortalData = null;
+  currentHold = null;
+  selectedBlock = null;
+  portalTab = 'room';
 
   markStudentLoggedOut();
+
+  try {
+    const {
+      error
+    } =
+      await supabase.auth.signOut();
+
+    if (error) {
+      console.error(
+        'Supabase logout failed:',
+        error
+      );
+    }
+
+  } catch (error) {
+    console.error(
+      'Unexpected logout error:',
+      error
+    );
+  }
 
   if (allocationSection) {
     allocationSection.innerHTML =
@@ -3137,11 +3250,6 @@ async function loadExistingAllocation() {
       return false;
     }
 
-    /*
-     * my-allocation returns the authenticated
-     * student.
-     */
-
     currentStudent =
       data.student;
 
@@ -3204,6 +3312,23 @@ async function loadExistingAllocation() {
 
 
 // --------------------------------------------------
+// CHANGE BLOCK
+// --------------------------------------------------
+
+if (changeBlockButton) {
+  changeBlockButton.addEventListener(
+    'click',
+    () => {
+      selectedBlock =
+        null;
+
+      showBlockSelection();
+    }
+  );
+}
+
+
+// --------------------------------------------------
 // EVENT LISTENERS
 // --------------------------------------------------
 
@@ -3223,9 +3348,7 @@ if (accessCodeInput) {
   accessCodeInput.addEventListener(
     'keydown',
     event => {
-      if (
-        event.key === 'Enter'
-      ) {
+      if (event.key === 'Enter') {
         event.preventDefault();
 
         activateStudent();
@@ -3239,9 +3362,7 @@ if (indexInput) {
   indexInput.addEventListener(
     'keydown',
     event => {
-      if (
-        event.key === 'Enter'
-      ) {
+      if (event.key === 'Enter') {
         event.preventDefault();
 
         activateStudent();
@@ -3294,6 +3415,50 @@ document
 
 
 // --------------------------------------------------
+// AUTH STATE LISTENER
+// --------------------------------------------------
+
+supabase.auth.onAuthStateChange(
+  async (event, session) => {
+    console.log(
+      'Supabase auth event:',
+      event
+    );
+
+    if (
+      event === 'SIGNED_OUT'
+    ) {
+      currentStudent = null;
+      currentAllocation = null;
+      currentPortalData = null;
+      currentHold = null;
+
+      stopHoldTimer();
+
+      if (
+        !wasStudentLoggedOut() &&
+        session === null
+      ) {
+        if (loginSection) {
+          loginSection.hidden =
+            false;
+        }
+      }
+    }
+
+    if (
+      event === 'TOKEN_REFRESHED' &&
+      !session
+    ) {
+      console.warn(
+        'Token refresh returned no session.'
+      );
+    }
+  }
+);
+
+
+// --------------------------------------------------
 // RESTORE EXISTING BROWSER SESSION
 // --------------------------------------------------
 
@@ -3305,15 +3470,17 @@ document
 
     updateProgress(1);
 
-    /*
-     * If the student explicitly logged out,
-     * never automatically reopen their portal.
-     */
+    const {
+      data: sessionData,
+      error: sessionError
+    } =
+      await supabase.auth.getSession();
 
-    if (
-      wasStudentLoggedOut()
-    ) {
-      clearStudentSessionToken();
+    if (sessionError) {
+      console.error(
+        'Unable to restore Supabase session:',
+        sessionError
+      );
 
       if (loginSection) {
         loginSection.hidden =
@@ -3323,59 +3490,111 @@ document
       return;
     }
 
-    /*
-     * First preference:
-     * restore our student session.
-     */
+    const session =
+      sessionData?.session;
 
-    const studentToken =
-      getStudentSessionToken();
+    // ------------------------------------------------
+    // Explicit browser logout.
+    // ------------------------------------------------
 
-    if (studentToken) {
-      const existingAllocation =
-        await loadExistingAllocation();
-
-      if (existingAllocation) {
-        return;
+    if (wasStudentLoggedOut()) {
+      if (session) {
+        await supabase.auth.signOut();
       }
 
-      /*
-       * If the token exists but no allocation
-       * was returned, don't leave the user
-       * trapped in a broken session.
-       */
+      if (loginSection) {
+        loginSection.hidden =
+          false;
+      }
 
-      clearStudentSessionToken();
+      return;
     }
 
-    /*
-     * Compatibility fallback for the current
-     * anonymous-auth implementation.
-     *
-     * Once multi-device student sessions are
-     * fully deployed, this fallback can be removed.
-     */
+    // ------------------------------------------------
+    // No authenticated session.
+    // ------------------------------------------------
 
-    const {
-      data: {
-        session
+    if (!session) {
+      if (loginSection) {
+        loginSection.hidden =
+          false;
       }
-    } =
-      await supabase.auth.getSession();
 
-    if (session) {
-      const existingAllocation =
-        await loadExistingAllocation();
+      return;
+    }
 
-      if (existingAllocation) {
-        return;
+    // ------------------------------------------------
+    // Reject old anonymous sessions.
+    // ------------------------------------------------
+
+    if (
+      session.user?.is_anonymous
+    ) {
+      console.warn(
+        'Anonymous Supabase session detected. Clearing old session.'
+      );
+
+      await supabase.auth.signOut();
+
+      if (loginSection) {
+        loginSection.hidden =
+          false;
       }
+
+      return;
+    }
+
+    // ------------------------------------------------
+    // Real permanent student session.
+    // ------------------------------------------------
+
+    const existingAllocation =
+      await loadExistingAllocation();
+
+    if (existingAllocation) {
+      return;
+    }
+
+    // ------------------------------------------------
+    // Authenticated but not allocated.
+    //
+    // We need the student record so the profile
+    // screen can determine whether gender is already
+    // stored.
+    // ------------------------------------------------
+
+    try {
+      const {
+        data,
+        error
+      } =
+        await invokeStudentFunction(
+          'my-allocation'
+        );
+
+      if (
+        !error &&
+        data?.student
+      ) {
+        currentStudent =
+          data.student;
+
+        currentPortalData =
+          data;
+      }
+    } catch (error) {
+      console.warn(
+        'Unable to restore student profile:',
+        error
+      );
     }
 
     if (loginSection) {
       loginSection.hidden =
-        false;
+        true;
     }
+
+    await showGenderSelection();
 
   } catch (error) {
     console.error(
