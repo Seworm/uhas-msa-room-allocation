@@ -450,8 +450,7 @@ function normalizePhoneNumber(value) {
 
 
 function isValidGhanaPhone(value) {
-  const phone =
-    normalizePhoneNumber(value);
+  const phone = normalizePhoneNumber(value);
 
   return /^(0[2356789][0-9]{8}|\+233[2356789][0-9]{8})$/
     .test(phone);
@@ -485,19 +484,15 @@ async function saveStudentPhone() {
     );
 
   if (!phone) {
-
     throw new Error(
       'Enter your phone number to continue.'
     );
-
   }
 
   if (!isValidGhanaPhone(phone)) {
-
     throw new Error(
       'Enter a valid Ghanaian phone number, e.g. 0241234567 or +233241234567.'
     );
-
   }
 
   const {
@@ -511,12 +506,10 @@ async function saveStudentPhone() {
   );
 
   if (error) {
-
     throw new Error(
       error.message ||
       'Unable to save your phone number.'
     );
-
   }
 
   if (currentStudent) {
@@ -525,6 +518,47 @@ async function saveStudentPhone() {
   }
 
   return data || phone;
+}
+
+
+async function savePhoneAndContinue() {
+
+  if (!savePhoneButton) {
+    return;
+  }
+
+  savePhoneButton.disabled = true;
+
+  genderMessage.className = '';
+
+  genderMessage.textContent =
+    'Saving your phone number...';
+
+  try {
+
+    await saveStudentPhone();
+
+    genderMessage.className =
+      'success-message';
+
+    genderMessage.textContent =
+      'Phone number saved securely.';
+
+    setTimeout(() => {
+      showBlockSelection();
+    }, 350);
+
+  } catch (error) {
+
+    genderMessage.className =
+      'error';
+
+    genderMessage.textContent =
+      error.message ||
+      'Unable to save your phone number.';
+
+    savePhoneButton.disabled = false;
+  }
 }
 // --------------------------------------------------
 // GENDER SELECTION
@@ -596,7 +630,7 @@ async function showGenderSelection() {
 }
 
 
-async function selectGender(gender) {
+aasync function selectGender(gender) {
 
   const normalized =
     normalizeGender(gender);
@@ -612,10 +646,6 @@ async function selectGender(gender) {
     '.gender-choice',
     true
   );
-
-  if (savePhoneButton) {
-    savePhoneButton.disabled = true;
-  }
 
   genderMessage.className = '';
 
@@ -640,12 +670,10 @@ async function selectGender(gender) {
     );
 
     if (error) {
-
       throw new Error(
         error.message ||
         'Unable to save gender selection.'
       );
-
     }
 
     currentStudent.gender =
@@ -658,9 +686,7 @@ async function selectGender(gender) {
       'Profile saved securely.';
 
     setTimeout(() => {
-
       showBlockSelection();
-
     }, 350);
 
   } catch (error) {
@@ -676,15 +702,8 @@ async function selectGender(gender) {
       '.gender-choice',
       false
     );
-
-    if (savePhoneButton) {
-      savePhoneButton.disabled = false;
-    }
-
   }
-
 }
-
 async function savePhoneAndContinue() {
 
   if (!savePhoneButton) {
@@ -2070,7 +2089,14 @@ if (indexInput) {
 
 }
 
+if (savePhoneButton) {
 
+  savePhoneButton.addEventListener(
+    'click',
+    savePhoneAndContinue
+  );
+
+}
 document
   .querySelectorAll('.gender-choice')
   .forEach(button => {
