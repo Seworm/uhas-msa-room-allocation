@@ -471,7 +471,31 @@ async function openRoom(roomId) {
     }
 }
 
+function closeRoomModal() {
 
+    const modal =
+        $("#roomModal");
+
+    if (modal) {
+
+        modal.classList.add(
+            "hidden"
+        );
+
+    }
+
+}
+const closeRoomButton =
+    $("#closeModal");
+
+if (closeRoomButton) {
+
+    closeRoomButton.addEventListener(
+        "click",
+        closeRoomModal
+    );
+
+}
 function renderOccupants(occupants) {
 
     const container =
