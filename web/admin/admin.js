@@ -186,7 +186,7 @@ async function loadCurrentProfile() {
     .select("*")
     .eq("id", currentUser.id)
     .maybeSingle();
-    
+
     if (error) {
         console.error("Unable to load admin profile:", error);
         currentProfile = null;
@@ -2959,4 +2959,10 @@ if (forgotPasswordLink) {
    START APPLICATION
    ========================================================= */
 
-initialise();
+if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", () => {
+        initialise();
+    }, { once: true });
+} else {
+    initialise();
+}
