@@ -577,10 +577,7 @@ async function loadAllocations() {
         await rpc(
             "admin_student_allocations",
             {
-                p_search:
-                    $("#studentSearch")
-                        .value
-                        .trim() || null,
+                p_search: null,
 
                 p_block:
                     $("#allocationBlockFilter")
@@ -601,13 +598,53 @@ function renderAllocations() {
     const tbody =
         $("#allocationsTable");
 
-    if (!currentAllocations?.length) {
+    const searchInput =
+        $("#studentSearch");
+
+    const search =
+        searchInput
+            ?.value
+            ?.trim()
+            ?.toLowerCase() || "";
+
+    const filtered =
+        (currentAllocations || []).filter(row => {
+
+            if (!search) {
+                return true;
+            }
+
+            const searchableText = [
+                row.student_id,
+                row.student_name,
+                row.email,
+                row.level,
+                row.programme,
+                row.gender,
+                row.block,
+                row.room_code,
+                row.room_number,
+                row.bed_number,
+                row.allocation_number
+            ]
+                .filter(value =>
+                    value !== null &&
+                    value !== undefined
+                )
+                .join(" ")
+                .toLowerCase();
+
+            return searchableText.includes(search);
+        });
+
+
+    if (!filtered.length) {
 
         tbody.innerHTML = `
             <tr>
-                <td colspan="8">
+                <td colspan="9">
                     <div class="empty-state">
-                        No allocations found.
+                        No students match your search.
                     </div>
                 </td>
             </tr>
@@ -616,8 +653,9 @@ function renderAllocations() {
         return;
     }
 
+
     tbody.innerHTML =
-        currentAllocations.map(row => `
+        filtered.map(row => `
 
             <tr>
 
@@ -667,14 +705,14 @@ function renderAllocations() {
                     )}
                 </td>
 
-                                <td>
+                <td>
                     ${escapeHtml(
                         row.allocation_number ??
                         "—"
                     )}
                 </td>
 
-                                <td>
+                <td>
 
                     ${
                         $("#adminRole")
@@ -722,7 +760,6 @@ function renderAllocations() {
 
         `).join("");
 }
-
 async function reassignStudent(allocationId) {
 
     if (!allocationId) {
@@ -1024,10 +1061,7 @@ async function loadUnallocated() {
         await rpc(
             "admin_unallocated_students",
             {
-                p_search:
-                    $("#unallocatedSearch")
-                        .value
-                        .trim() || null
+                p_search: null
             }
         );
 
@@ -1040,13 +1074,49 @@ function renderUnallocated() {
     const tbody =
         $("#unallocatedTable");
 
-    if (!currentUnallocated?.length) {
+    const searchInput =
+        $("#unallocatedSearch");
+
+    const search =
+        searchInput
+            ?.value
+            ?.trim()
+            ?.toLowerCase() || "";
+
+
+    const filtered =
+        (currentUnallocated || []).filter(row => {
+
+            if (!search) {
+                return true;
+            }
+
+            const searchableText = [
+                row.student_id,
+                row.student_name,
+                row.email,
+                row.level,
+                row.programme,
+                row.gender
+            ]
+                .filter(value =>
+                    value !== null &&
+                    value !== undefined
+                )
+                .join(" ")
+                .toLowerCase();
+
+            return searchableText.includes(search);
+        });
+
+
+    if (!filtered.length) {
 
         tbody.innerHTML = `
             <tr>
                 <td colspan="6">
                     <div class="empty-state">
-                        No unallocated eligible students found.
+                        No students match your search.
                     </div>
                 </td>
             </tr>
@@ -1055,8 +1125,9 @@ function renderUnallocated() {
         return;
     }
 
+
     tbody.innerHTML =
-        currentUnallocated.map(row => `
+        filtered.map(row => `
 
             <tr>
 
@@ -1102,7 +1173,6 @@ function renderUnallocated() {
 
         `).join("");
 }
-
 
 /* ============================================================
    Audit logs
@@ -1656,6 +1726,23 @@ $("#allocationBlockFilter")
         "change",
         loadAllocations
     );
+
+/* ============================================================
+   LIVE STUDENT SEARCH
+   ============================================================ */
+
+const studentSearch =
+    $("#studentSearch");
+
+if (studentSearch) {
+
+    studentSearch.addEventListener(
+        "input",
+        () => {
+            renderAllocations();
+        }
+    );
+}
 /* ============================================================
    Allocation actions
    ============================================================ */
