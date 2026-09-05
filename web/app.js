@@ -891,82 +891,577 @@ function renderPortalTab() {
   if (portalTab === 'details') return renderAllocationDetailsTab();
   return renderMyRoomTab();
 }
-
 function renderMyRoomTab() {
   const allocation = currentAllocation;
   const bed = allocation?.beds;
   const room = bed?.rooms;
 
+  const roomCode = room?.room_code || '—';
+  const block = room?.block || '—';
+  const floor = room?.floor ?? '—';
+  const roomNumber = room?.room_number ?? '—';
+  const bedNumber = bed?.bed_number ?? '—';
+
+  const allocationNumber =
+    allocation?.allocation_number || '—';
+
+  const status =
+    allocation?.status || 'CONFIRMED';
+
+  const createdAt =
+    allocation?.created_at
+      ? new Date(allocation.created_at).toLocaleDateString('en-GB', {
+          day: '2-digit',
+          month: 'short',
+          year: 'numeric'
+        })
+      : '—';
+
+  const roommates = Array.isArray(currentPortalData?.roommates)
+    ? currentPortalData.roommates
+    : [];
+
+  const occupantCount = roommates.length + 1;
+
   return `
-    <section class="portal-panel">
-      <div class="portal-panel-heading">
-        <span class="eyebrow">YOUR ACCOMMODATION</span>
-        <h3>My Room</h3>
-        <p>Your currently assigned room and bed.</p>
-      </div>
-      <div class="my-room-card">
-        <div class="my-room-primary">
-          <span class="room-label">ROOM</span>
-          <strong class="portal-room-code">${escapeHtml(room?.room_code || '—')}</strong>
-          <span class="room-location">${escapeHtml(room?.block || '')} · Floor ${escapeHtml(room?.floor ?? '—')} · Room ${escapeHtml(room?.room_number ?? '—')}</span>
+    <section class="portal-panel my-room-panel">
+
+      <!-- HEADER -->
+      <div class="portal-panel-heading my-room-heading">
+
+        <div>
+          <span class="eyebrow">
+            YOUR ACCOMMODATION
+          </span>
+
+          <h3>
+            My Room
+          </h3>
+
+          <p>
+            Your confirmed room assignment at UHAS Asogli Hall.
+          </p>
         </div>
-        <div class="my-room-bed">
-          <span class="room-label">ASSIGNED BED</span>
-          <strong>Bed ${escapeHtml(bed?.bed_number ?? '—')}</strong>
+
+        <span class="allocation-status-badge">
+          <span class="status-dot"></span>
+          ${escapeHtml(status)}
+        </span>
+
+      </div>
+
+
+      <!-- ROOM HERO -->
+      <div class="my-room-hero">
+
+        <div class="my-room-hero-main">
+
+          <span class="allocation-hero-label">
+            ROOM
+          </span>
+
+          <strong class="my-room-code">
+            ${escapeHtml(roomCode)}
+          </strong>
+
+          <span class="my-room-location">
+            ${escapeHtml(block)} Block
+            <span>•</span>
+            Floor ${escapeHtml(floor)}
+            <span>•</span>
+            Room ${escapeHtml(roomNumber)}
+          </span>
+
         </div>
+
+
+        <div class="my-room-bed-highlight">
+
+          <span>
+            YOUR BED
+          </span>
+
+          <strong>
+            ${escapeHtml(bedNumber)}
+          </strong>
+
+          <small>
+            Assigned bed
+          </small>
+
+        </div>
+
       </div>
-      <div class="portal-info-grid">
-        <div class="portal-info-card"><span>BLOCK</span><strong>${escapeHtml(room?.block || '—')}</strong></div>
-        <div class="portal-info-card"><span>ROOM</span><strong>${escapeHtml(room?.room_number ?? '—')}</strong></div>
-        <div class="portal-info-card"><span>FLOOR</span><strong>${escapeHtml(room?.floor ?? '—')}</strong></div>
-        <div class="portal-info-card"><span>BED</span><strong>${escapeHtml(bed?.bed_number ?? '—')}</strong></div>
+
+
+      <!-- ROOM SUMMARY -->
+      <div class="allocation-section-title">
+
+        <span class="allocation-section-icon">
+          ⌂
+        </span>
+
+        <div>
+          <strong>
+            Accommodation Assignment
+          </strong>
+
+          <span>
+            Your assigned location within Asogli Hall
+          </span>
+        </div>
+
       </div>
+
+
+      <div class="allocation-room-grid">
+
+        <div class="allocation-room-item primary">
+          <span>
+            BLOCK
+          </span>
+
+          <strong>
+            ${escapeHtml(block)}
+          </strong>
+        </div>
+
+
+        <div class="allocation-room-item primary">
+          <span>
+            ROOM
+          </span>
+
+          <strong>
+            ${escapeHtml(roomNumber)}
+          </strong>
+        </div>
+
+
+        <div class="allocation-room-item highlight">
+          <span>
+            ASSIGNED BED
+          </span>
+
+          <strong>
+            Bed ${escapeHtml(bedNumber)}
+          </strong>
+        </div>
+
+
+        <div class="allocation-room-item">
+          <span>
+            FLOOR
+          </span>
+
+          <strong>
+            ${escapeHtml(floor)}
+          </strong>
+        </div>
+
+      </div>
+
+
+      <!-- ROOM OCCUPANCY -->
+      <div class="allocation-section-title">
+
+        <span class="allocation-section-icon">
+          ◉
+        </span>
+
+        <div>
+          <strong>
+            Room Occupancy
+          </strong>
+
+          <span>
+            Students currently assigned to this room
+          </span>
+        </div>
+
+      </div>
+
+
+      <div class="room-occupancy-card">
+
+        <div class="occupancy-icon">
+          👥
+        </div>
+
+        <div class="occupancy-copy">
+
+          <strong>
+            ${occupantCount}
+            ${occupantCount === 1 ? 'Student' : 'Students'}
+          </strong>
+
+          <span>
+            Currently assigned to this room
+          </span>
+
+        </div>
+
+        <div class="occupancy-action">
+
+          <button
+            type="button"
+            class="secondary-button"
+            data-portal-tab="roommates"
+            id="viewRoommatesFromRoom"
+          >
+            View roommates
+            <span aria-hidden="true">→</span>
+          </button>
+
+        </div>
+
+      </div>
+
+
+      <!-- ALLOCATION RECORD -->
+      <div class="allocation-record">
+
+        <div>
+          <span>
+            ALLOCATION NUMBER
+          </span>
+
+          <strong>
+            ${escapeHtml(allocationNumber)}
+          </strong>
+        </div>
+
+        <div>
+          <span>
+            ALLOCATION DATE
+          </span>
+
+          <strong>
+            ${escapeHtml(createdAt)}
+          </strong>
+        </div>
+
+      </div>
+
     </section>
   `;
 }
-
 function renderRoommatesTab() {
-  const roommates = Array.isArray(currentPortalData?.roommates) ? currentPortalData.roommates : [];
+
+  const roommates = Array.isArray(currentPortalData?.roommates)
+    ? currentPortalData.roommates
+    : [];
+
+  const bed = currentAllocation?.beds;
+  const room = bed?.rooms;
+
+  const roomCode = room?.room_code || '—';
+  const block = room?.block || '—';
+  const roomNumber = room?.room_number ?? '—';
+
+  const occupantCount = roommates.length + 1;
+
+  // --------------------------------------------------
+  // EMPTY STATE
+  // --------------------------------------------------
+
   if (!roommates.length) {
+
     return `
-      <section class="portal-panel">
-        <div class="portal-panel-heading">
-          <span class="eyebrow">YOUR ROOM</span>
-          <h3>Roommates</h3>
-          <p>Other students assigned to your room.</p>
+      <section class="portal-panel roommates-panel">
+
+        <div class="portal-panel-heading roommates-heading">
+
+          <div>
+            <span class="eyebrow">
+              YOUR ROOM
+            </span>
+
+            <h3>
+              My Roommates
+            </h3>
+
+            <p>
+              Students currently assigned to your room.
+            </p>
+          </div>
+
+          <span class="room-occupancy-pill">
+            1 occupant
+          </span>
+
         </div>
-        <div class="portal-empty-state">
-          <div class="empty-icon">◉</div>
-          <h4>No other roommates found</h4>
-          <p>There are currently no other allocated students returned for this room.</p>
+
+
+        <!-- ROOM SUMMARY -->
+        <div class="roommates-room-summary">
+
+          <div>
+
+            <span>
+              ROOM
+            </span>
+
+            <strong>
+              ${escapeHtml(roomCode)}
+            </strong>
+
+          </div>
+
+          <div>
+
+            <span>
+              BLOCK
+            </span>
+
+            <strong>
+              ${escapeHtml(block)}
+            </strong>
+
+          </div>
+
+          <div>
+
+            <span>
+              ROOM NUMBER
+            </span>
+
+            <strong>
+              ${escapeHtml(roomNumber)}
+            </strong>
+
+          </div>
+
         </div>
+
+
+        <div class="roommates-empty-state">
+
+          <div class="roommates-empty-icon">
+            👥
+          </div>
+
+          <span class="eyebrow">
+            ROOM STATUS
+          </span>
+
+          <h4>
+            You currently have no roommates
+          </h4>
+
+          <p>
+            No other students are currently assigned
+            to your room.
+          </p>
+
+        </div>
+
       </section>
     `;
   }
 
+
+  // --------------------------------------------------
+  // ROOMMATE DIRECTORY
+  // --------------------------------------------------
+
   return `
-    <section class="portal-panel">
-      <div class="portal-panel-heading">
-        <span class="eyebrow">YOUR ROOM</span>
-        <h3>Roommates</h3>
-        <p>${roommates.length} ${roommates.length === 1 ? 'other student' : 'other students'} currently assigned to your room.</p>
+    <section class="portal-panel roommates-panel">
+
+      <!-- HEADER -->
+      <div class="portal-panel-heading roommates-heading">
+
+        <div>
+
+          <span class="eyebrow">
+            YOUR ROOM
+          </span>
+
+          <h3>
+            My Roommates
+          </h3>
+
+          <p>
+            Students currently assigned to your room.
+          </p>
+
+        </div>
+
+        <span class="room-occupancy-pill">
+          ${occupantCount}
+          ${occupantCount === 1 ? 'occupant' : 'occupants'}
+        </span>
+
       </div>
-      <div class="roommate-list">
-        ${roommates.map(r => `
-          <article class="roommate-card">
-            <div class="roommate-avatar">${escapeHtml(String(r?.student_name || '?').trim().charAt(0).toUpperCase())}</div>
-            <div class="roommate-details">
-              <strong>${escapeHtml(r?.student_name || 'Student')}</strong>
-              <span>${escapeHtml(r?.programme || 'Programme not available')}</span>
-              <span>Level ${escapeHtml(r?.level ?? '—')}</span>
-            </div>
-          </article>
-        `).join('')}
+
+
+      <!-- ROOM SUMMARY -->
+      <div class="roommates-room-summary">
+
+        <div>
+
+          <span>
+            ROOM
+          </span>
+
+          <strong>
+            ${escapeHtml(roomCode)}
+          </strong>
+
+        </div>
+
+
+        <div>
+
+          <span>
+            BLOCK
+          </span>
+
+          <strong>
+            ${escapeHtml(block)}
+          </strong>
+
+        </div>
+
+
+        <div>
+
+          <span>
+            OCCUPANCY
+          </span>
+
+          <strong>
+            ${occupantCount}
+            ${occupantCount === 1 ? 'student' : 'students'}
+          </strong>
+
+        </div>
+
       </div>
+
+
+      <!-- DIRECTORY TITLE -->
+      <div class="allocation-section-title">
+
+        <span class="allocation-section-icon">
+          ◉
+        </span>
+
+        <div>
+
+          <strong>
+            Students in Your Room
+          </strong>
+
+          <span>
+            Other students assigned to ${escapeHtml(roomCode)}
+          </span>
+
+        </div>
+
+      </div>
+
+
+      <!-- ROOMMATES -->
+      <div class="modern-roommate-grid">
+
+        ${roommates.map((roommate, index) => {
+
+          const name =
+            String(roommate?.student_name || 'Student').trim();
+
+          const programme =
+            roommate?.programme || 'Programme not available';
+
+          const level =
+            roommate?.level ?? '—';
+
+          const initials =
+            name
+              .split(/\s+/)
+              .filter(Boolean)
+              .slice(0, 2)
+              .map(part => part.charAt(0).toUpperCase())
+              .join('') || '?';
+
+          return `
+            <article class="modern-roommate-card">
+
+              <div class="roommate-card-top">
+
+                <div class="modern-roommate-avatar">
+                  ${escapeHtml(initials)}
+                </div>
+
+                <span class="roommate-number">
+                  ROOMMATE ${index + 1}
+                </span>
+
+              </div>
+
+
+              <div class="modern-roommate-details">
+
+                <h4>
+                  ${escapeHtml(name)}
+                </h4>
+
+                <div class="roommate-programme">
+                  ${escapeHtml(programme)}
+                </div>
+
+                <div class="roommate-level">
+                  Level ${escapeHtml(level)}
+                </div>
+
+              </div>
+
+              <div class="roommate-card-footer">
+
+                <span>
+                  Assigned to room
+                </span>
+
+                <strong>
+                  ${escapeHtml(roomCode)}
+                </strong>
+
+              </div>
+
+            </article>
+          `;
+
+        }).join('')}
+
+      </div>
+
+
+      <!-- PRIVACY NOTE -->
+      <div class="roommates-privacy-note">
+
+        <span class="privacy-icon">
+          ✓
+        </span>
+
+        <div>
+
+          <strong>
+            Student privacy protected
+          </strong>
+
+          <p>
+            Only basic accommodation information is displayed.
+            Private contact and identification details are not
+            shown.
+          </p>
+
+        </div>
+
+      </div>
+
     </section>
   `;
 }
-
 function renderAllocationDetailsTab() {
 
   const allocation = currentAllocation;
