@@ -182,11 +182,11 @@ async function loadCurrentProfile() {
     }
 
     const { data, error } = await supabase
-        .from("profiles")
-        .select("*")
-        .eq("auth_user_id", currentUser.id)
-        .maybeSingle();
-
+    .from("profiles")
+    .select("*")
+    .eq("id", currentUser.id)
+    .maybeSingle();
+    
     if (error) {
         console.error("Unable to load admin profile:", error);
         currentProfile = null;
