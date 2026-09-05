@@ -671,3 +671,310 @@ code {
         font-size: 28px;
     }
 }
+/* =========================================================
+   SUPER ADMIN — ADMINISTRATOR MANAGEMENT
+   ========================================================= */
+
+#adminManagementSection {
+    margin-top: 28px;
+}
+
+#adminManagementSection .panel-header {
+    align-items: center;
+    gap: 20px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+#adminManagementSection .panel-header h2 {
+    margin: 0 0 6px;
+    font-size: 1.25rem;
+    font-weight: 700;
+}
+
+#adminManagementSection .panel-header p {
+    margin: 0;
+    color: #6b7280;
+    font-size: 0.9rem;
+}
+
+#addAdminButton {
+    white-space: nowrap;
+}
+
+/* Administrator table */
+
+#adminManagementSection .table-wrap {
+    margin-top: 20px;
+    overflow-x: auto;
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+}
+
+#adminManagementSection table {
+    width: 100%;
+    border-collapse: collapse;
+    min-width: 680px;
+}
+
+#adminManagementSection th {
+    background: #f8fafc;
+    color: #475569;
+    font-size: 0.78rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    padding: 13px 16px;
+    text-align: left;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+#adminManagementSection td {
+    padding: 15px 16px;
+    border-bottom: 1px solid #eef2f7;
+    color: #1f2937;
+    font-size: 0.9rem;
+    vertical-align: middle;
+}
+
+#adminManagementSection tbody tr:last-child td {
+    border-bottom: none;
+}
+
+#adminManagementSection tbody tr:hover {
+    background: #f8fafc;
+}
+
+/* Role badges */
+
+.admin-role-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 5px 10px;
+    border-radius: 999px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    line-height: 1;
+}
+
+.admin-role-badge.admin {
+    background: #eff6ff;
+    color: #1d4ed8;
+}
+
+.admin-role-badge.super-admin {
+    background: #f3e8ff;
+    color: #7e22ce;
+}
+
+/* Action buttons */
+
+.admin-action-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.admin-action-button {
+    border: 1px solid #d1d5db;
+    background: #ffffff;
+    color: #374151;
+    border-radius: 7px;
+    padding: 7px 10px;
+    font-size: 0.78rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition:
+        background 0.15s ease,
+        border-color 0.15s ease,
+        color 0.15s ease;
+}
+
+.admin-action-button:hover {
+    background: #f8fafc;
+    border-color: #9ca3af;
+}
+
+.admin-action-button.danger {
+    color: #b91c1c;
+    border-color: #fecaca;
+}
+
+.admin-action-button.danger:hover {
+    background: #fef2f2;
+    border-color: #fca5a5;
+}
+
+/* Administrator modal */
+
+#adminManagementModal {
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    background: rgba(15, 23, 42, 0.55);
+    backdrop-filter: blur(3px);
+}
+
+#adminManagementModal .modal-content {
+    width: min(100%, 480px);
+    max-height: calc(100vh - 40px);
+    overflow-y: auto;
+    background: #ffffff;
+    border-radius: 16px;
+    box-shadow: 0 24px 70px rgba(15, 23, 42, 0.25);
+    padding: 0;
+}
+
+#adminManagementModal .modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 20px 22px;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+#adminManagementModal .modal-header h2 {
+    margin: 0;
+    font-size: 1.15rem;
+    font-weight: 700;
+    color: #111827;
+}
+
+#adminManagementModal .modal-close {
+    width: 34px;
+    height: 34px;
+    border: none;
+    border-radius: 8px;
+    background: #f3f4f6;
+    color: #4b5563;
+    font-size: 22px;
+    line-height: 1;
+    cursor: pointer;
+}
+
+#adminManagementModal .modal-close:hover {
+    background: #e5e7eb;
+}
+
+#adminManagementModal form {
+    padding: 22px;
+}
+
+#adminManagementModal label {
+    display: block;
+    margin: 0 0 7px;
+    color: #374151;
+    font-size: 0.85rem;
+    font-weight: 650;
+}
+
+#adminManagementModal input,
+#adminManagementModal select {
+    width: 100%;
+    box-sizing: border-box;
+    min-height: 44px;
+    margin: 0 0 17px;
+    padding: 10px 12px;
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    background: #ffffff;
+    color: #111827;
+    font-size: 0.95rem;
+    outline: none;
+    transition:
+        border-color 0.15s ease,
+        box-shadow 0.15s ease;
+}
+
+#adminManagementModal input:focus,
+#adminManagementModal select:focus {
+    border-color: #2563eb;
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+}
+
+#adminManagementModal .error {
+    min-height: 20px;
+    margin: 0 0 12px;
+    color: #b91c1c;
+    font-size: 0.85rem;
+}
+
+#adminManagementModal .modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    padding-top: 5px;
+}
+
+#adminManagementModal .primary-button,
+#adminManagementModal .secondary-button {
+    min-height: 42px;
+    border-radius: 8px;
+    padding: 9px 15px;
+    font-size: 0.88rem;
+    font-weight: 650;
+    cursor: pointer;
+}
+
+#adminManagementModal .secondary-button {
+    background: #ffffff;
+    border: 1px solid #d1d5db;
+    color: #374151;
+}
+
+#adminManagementModal .secondary-button:hover {
+    background: #f9fafb;
+}
+
+#adminManagementModal .primary-button {
+    border: 1px solid transparent;
+}
+
+/* Mobile */
+
+@media (max-width: 640px) {
+
+    #adminManagementSection {
+        margin-top: 20px;
+    }
+
+    #adminManagementSection .panel-header {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    #addAdminButton {
+        width: 100%;
+    }
+
+    #adminManagementSection .table-wrap {
+        margin-top: 15px;
+        border-radius: 10px;
+    }
+
+    #adminManagementModal {
+        align-items: flex-end;
+        padding: 10px;
+    }
+
+    #adminManagementModal .modal-content {
+        width: 100%;
+        max-height: calc(100vh - 20px);
+        border-radius: 16px 16px 10px 10px;
+    }
+
+    #adminManagementModal .modal-actions {
+        flex-direction: column-reverse;
+    }
+
+    #adminManagementModal .primary-button,
+    #adminManagementModal .secondary-button {
+        width: 100%;
+    }
+}
