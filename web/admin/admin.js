@@ -3,8 +3,9 @@ import { supabase } from "../supabase.js";
 /* =========================================================
    UHAS ASOGLI HALL ROOM ALLOCATION
    ADMIN PORTAL
-   CLEAN PRODUCTION JAVASCRIPT
+   PRODUCTION JAVASCRIPT
    ========================================================= */
+
 
 /* =========================================================
    STATE
@@ -12,9 +13,13 @@ import { supabase } from "../supabase.js";
 
 let currentUser = null;
 let currentProfile = null;
+
 let isInitialising = false;
+let applicationInitialised = false;
+
 let searchTimer = null;
 let unallocatedSearchTimer = null;
+
 let adminManagementInitialised = false;
 
 
@@ -24,37 +29,53 @@ let adminManagementInitialised = false;
 
 const $ = (selector) => document.querySelector(selector);
 
-const $$ = (selector) => Array.from(document.querySelectorAll(selector));
+const $$ = (selector) =>
+    Array.from(document.querySelectorAll(selector));
+
 
 function setText(selector, value) {
     const element = $(selector);
 
-    if (element) {
-        element.textContent =
-            value === null || value === undefined ? "" : String(value);
+    if (!element) {
+        return;
     }
+
+    element.textContent =
+        value === null || value === undefined
+            ? ""
+            : String(value);
 }
+
 
 function showElement(selector) {
     const element = $(selector);
 
-    if (element) {
-        element.hidden = false;
-        element.style.display = "";
+    if (!element) {
+        return;
     }
+
+    element.hidden = false;
+    element.style.display = "";
 }
+
 
 function hideElement(selector) {
     const element = $(selector);
 
-    if (element) {
-        element.hidden = true;
-        element.style.display = "none";
+    if (!element) {
+        return;
     }
+
+    element.hidden = true;
+    element.style.display = "none";
 }
 
+
 function escapeHtml(value) {
-    if (value === null || value === undefined) {
+    if (
+        value === null ||
+        value === undefined
+    ) {
         return "";
     }
 
@@ -65,6 +86,7 @@ function escapeHtml(value) {
         .replace(/"/g, "&quot;")
         .replace(/'/g, "&#039;");
 }
+
 
 function formatDate(value) {
     if (!value) {
@@ -82,6 +104,7 @@ function formatDate(value) {
         timeStyle: "short"
     });
 }
+
 
 function formatDateOnly(value) {
     if (!value) {
@@ -101,20 +124,34 @@ function formatDateOnly(value) {
     });
 }
 
+
 function normalise(value) {
-    return String(value || "").trim().toLowerCase();
+    return String(value || "")
+        .trim()
+        .toLowerCase()
+        .replace(/[\s-]+/g, "_");
 }
+
 
 function csvEscape(value) {
     const text =
-        value === null || value === undefined
+        value === null ||
+        value === undefined
             ? ""
             : String(value);
 
     return `"${text.replace(/"/g, '""')}"`;
 }
 
-function showToast(message, type = "success") {
+
+/* =========================================================
+   TOASTS
+   ========================================================= */
+
+function showToast(
+    message,
+    type = "success"
+) {
     const toast = $("#toast");
 
     if (!toast) {
@@ -122,40 +159,61 @@ function showToast(message, type = "success") {
     }
 
     toast.textContent = message;
-    toast.className = `toast ${type}`;
+
+    toast.className =
+        `toast ${type}`;
+
     toast.classList.add("show");
 
-    window.clearTimeout(showToast.timer);
+    window.clearTimeout(
+        showToast.timer
+    );
 
-    showToast.timer = window.setTimeout(() => {
-        toast.classList.remove("show");
-    }, 3500);
+    showToast.timer =
+        window.setTimeout(() => {
+            toast.classList.remove("show");
+        }, 3500);
 }
+
 
 function showError(message) {
     console.error(message);
-    showToast(message, "error");
+
+    showToast(
+        message,
+        "error"
+    );
 }
 
-function setButtonLoading(button, loading, loadingText = "Processing...") {
+
+function setButtonLoading(
+    button,
+    loading,
+    loadingText = "Processing..."
+) {
     if (!button) {
         return;
     }
 
     if (loading) {
         if (!button.dataset.originalText) {
-            button.dataset.originalText = button.textContent;
+            button.dataset.originalText =
+                button.textContent;
         }
 
         button.disabled = true;
         button.textContent = loadingText;
-    } else {
-        button.disabled = false;
 
-        if (button.dataset.originalText) {
-            button.textContent = button.dataset.originalText;
-            delete button.dataset.originalText;
-        }
+        return;
+    }
+
+    button.disabled = false;
+
+    if (button.dataset.originalText) {
+        button.textContent =
+            button.dataset.originalText;
+
+        delete button.dataset.originalText;
     }
 }
 
@@ -165,106 +223,244 @@ function setButtonLoading(button, loading, loadingText = "Processing...") {
    ========================================================= */
 
 async function getCurrentSession() {
-    const { data, error } = await supabase.auth.getSession();
+    try {
+        const {
+            data,
+            error
+        } = await supabase.auth.getSession();
 
-    if (error) {
-        console.error("Unable to get session:", error);
+        if (error) {
+            console.error(
+                "Unable to get session:",
+                error
+            );
+
+            return null;
+        }
+
+        return data?.session || null;
+    } catch (error) {
+        console.error(
+            "Session error:",
+            error
+        );
+
         return null;
     }
-
-    return data?.session || null;
 }
 
+
+/*
+ * IMPORTANT:
+ * The profiles table in the current database does NOT expose
+ * auth_user_id.
+ *
+ * Therefore this function deliberately uses profiles.id first.
+ * It also safely falls back to metadata if no profile exists.
+ */
 async function loadCurrentProfile() {
+    currentProfile = null;
+
     if (!currentUser?.id) {
-        currentProfile = null;
         return null;
     }
 
-    const { data, error } = await supabase
-    .from("profiles")
-    .select("*")
-    .eq("id", currentUser.id)
-    .maybeSingle();
+    try {
+        const {
+            data,
+            error
+        } = await supabase
+            .from("profiles")
+            .select("*")
+            .eq("id", currentUser.id)
+            .maybeSingle();
 
-    if (error) {
-        console.error("Unable to load admin profile:", error);
+        if (error) {
+            /*
+             * Do not crash the entire admin portal because
+             * the profile lookup failed.
+             */
+            console.warn(
+                "Admin profile lookup failed:",
+                error
+            );
+
+            currentProfile = null;
+
+            return null;
+        }
+
+        currentProfile =
+            data || null;
+
+        return currentProfile;
+    } catch (error) {
+        console.warn(
+            "Unable to load admin profile:",
+            error
+        );
+
         currentProfile = null;
+
         return null;
     }
-
-    currentProfile = data || null;
-
-    return currentProfile;
 }
+
 
 function getUserRole() {
-    if (!currentProfile) {
-        return null;
+    /*
+     * Profile role has priority.
+     */
+    const profileRole =
+        currentProfile?.role ||
+        currentProfile?.user_role ||
+        currentProfile?.admin_role ||
+        currentProfile?.access_level ||
+        currentProfile?.account_role;
+
+    if (profileRole) {
+        return profileRole;
     }
 
+    /*
+     * Supabase auth metadata fallback.
+     */
+    const metadata =
+        currentUser?.user_metadata ||
+        {};
+
     return (
-        currentProfile.role ||
-        currentProfile.user_role ||
-        currentProfile.admin_role ||
+        metadata.role ||
+        metadata.user_role ||
+        metadata.admin_role ||
+        metadata.access_level ||
         null
     );
 }
 
+
 function isSuperAdmin() {
-    const roleElement = $("#adminRole");
+    const role =
+        normalise(getUserRole());
 
-    if (roleElement) {
-        const roleText = normalise(roleElement.textContent);
-
-        if (roleText.includes("super admin")) {
-            return true;
-        }
+    if (
+        role === "super_admin" ||
+        role === "superadmin" ||
+        role === "super_admin_role"
+    ) {
+        return true;
     }
 
-    const role = normalise(getUserRole());
+    /*
+     * Also inspect displayed role if the backend does not
+     * expose the profile role.
+     */
+    const roleElements = [
+        "#adminRole",
+        "#mobileAdminRole",
+        "#sidebarAdminRole"
+    ];
 
-    return role === "super_admin" || role === "super admin";
+    return roleElements.some(
+        (selector) => {
+            const element = $(selector);
+
+            if (!element) {
+                return false;
+            }
+
+            const text =
+                normalise(
+                    element.textContent
+                );
+
+            return (
+                text === "super_admin" ||
+                text === "superadmin" ||
+                text.includes("super_admin") ||
+                text.includes("super admin")
+            );
+        }
+    );
 }
 
+
 function updateRoleDisplay() {
-    const role = getUserRole();
+    const role =
+        normalise(getUserRole());
 
-    let displayRole = "ADMIN";
+    const superAdmin =
+        role === "super_admin" ||
+        role === "superadmin" ||
+        isSuperAdmin();
 
-    if (role === "super_admin" || role === "super admin") {
-        displayRole = "SUPER ADMIN";
-    }
+    const displayRole =
+        superAdmin
+            ? "SUPER ADMIN"
+            : "ADMIN";
 
-    setText("#adminRole", displayRole);
-    setText("#mobileAdminRole", displayRole);
-    setText("#sidebarAdminRole", displayRole);
+    setText(
+        "#adminRole",
+        displayRole
+    );
 
-    const managementNav = $("#administratorsNavItem");
-    const managementSection = $("#adminManagementSection");
+    setText(
+        "#mobileAdminRole",
+        displayRole
+    );
 
-    if (isSuperAdmin()) {
+    setText(
+        "#sidebarAdminRole",
+        displayRole
+    );
+
+    const managementNav =
+        $("#administratorsNavItem");
+
+    const managementSection =
+        $("#adminManagementSection");
+
+    if (superAdmin) {
         if (managementNav) {
             managementNav.style.display = "";
+            managementNav.hidden = false;
         }
     } else {
         if (managementNav) {
-            managementNav.style.display = "none";
+            managementNav.style.display =
+                "none";
+
+            managementNav.hidden = true;
         }
 
         if (managementSection) {
-            managementSection.style.display = "none";
+            managementSection.style.display =
+                "none";
+
+            managementSection.hidden = true;
         }
     }
 }
+
+
+/* =========================================================
+   LOGIN
+   ========================================================= */
 
 async function handleLogin(event) {
     event.preventDefault();
 
-    const email = $("#email")?.value.trim();
-    const password = $("#password")?.value || "";
-    const button = $("#loginButton");
-    const errorElement = $("#loginError");
+    const email =
+        $("#email")?.value.trim();
+
+    const password =
+        $("#password")?.value || "";
+
+    const button =
+        $("#loginButton");
+
+    const errorElement =
+        $("#loginError");
 
     if (errorElement) {
         errorElement.textContent = "";
@@ -272,16 +468,24 @@ async function handleLogin(event) {
 
     if (!email || !password) {
         if (errorElement) {
-            errorElement.textContent = "Enter your email and password.";
+            errorElement.textContent =
+                "Enter your email and password.";
         }
 
         return;
     }
 
-    setButtonLoading(button, true, "Signing in...");
+    setButtonLoading(
+        button,
+        true,
+        "Signing in..."
+    );
 
     try {
-        const { data, error } = await supabase.auth.signInWithPassword({
+        const {
+            data,
+            error
+        } = await supabase.auth.signInWithPassword({
             email,
             password
         });
@@ -290,7 +494,8 @@ async function handleLogin(event) {
             throw error;
         }
 
-        currentUser = data.user;
+        currentUser =
+            data?.user || null;
 
         await loadCurrentProfile();
 
@@ -302,37 +507,56 @@ async function handleLogin(event) {
 
         await loadEverything();
 
-        showToast("Login successful.");
+        activateSection(
+            "dashboardSection"
+        );
+
+        showToast(
+            "Login successful."
+        );
     } catch (error) {
-        console.error("Login error:", error);
+        console.error(
+            "Login error:",
+            error
+        );
 
         if (errorElement) {
             errorElement.textContent =
-                error?.message || "Unable to sign in.";
+                error?.message ||
+                "Unable to sign in.";
         }
     } finally {
-        setButtonLoading(button, false);
+        setButtonLoading(
+            button,
+            false
+        );
     }
 }
+
 
 async function handleLogout() {
     try {
         await supabase.auth.signOut();
     } catch (error) {
-        console.error("Logout error:", error);
+        console.error(
+            "Logout error:",
+            error
+        );
     }
 
     currentUser = null;
     currentProfile = null;
 
     showLogin();
-
-    showToast("You have been logged out.");
 }
 
+
 function showLogin() {
-    const loginView = $("#loginView");
-    const appView = $("#appView");
+    const loginView =
+        $("#loginView");
+
+    const appView =
+        $("#appView");
 
     if (loginView) {
         loginView.style.display = "";
@@ -340,17 +564,25 @@ function showLogin() {
     }
 
     if (appView) {
-        appView.style.display = "none";
+        appView.style.display =
+            "none";
+
         appView.hidden = true;
     }
 }
 
+
 function showApp() {
-    const loginView = $("#loginView");
-    const appView = $("#appView");
+    const loginView =
+        $("#loginView");
+
+    const appView =
+        $("#appView");
 
     if (loginView) {
-        loginView.style.display = "none";
+        loginView.style.display =
+            "none";
+
         loginView.hidden = true;
     }
 
@@ -360,10 +592,12 @@ function showApp() {
     }
 }
 
+
 async function handlePasswordReset(event) {
     event.preventDefault();
 
-    const email = $("#email")?.value.trim();
+    const email =
+        $("#email")?.value.trim();
 
     if (!email) {
         showToast(
@@ -378,12 +612,16 @@ async function handlePasswordReset(event) {
         const redirectUrl =
             `${window.location.origin}${window.location.pathname}`;
 
-        const { error } = await supabase.auth.resetPasswordForEmail(
-            email,
-            {
-                redirectTo: redirectUrl
-            }
-        );
+        const {
+            error
+        } =
+            await supabase.auth.resetPasswordForEmail(
+                email,
+                {
+                    redirectTo:
+                        redirectUrl
+                }
+            );
 
         if (error) {
             throw error;
@@ -393,10 +631,14 @@ async function handlePasswordReset(event) {
             "Password reset instructions have been sent to your email."
         );
     } catch (error) {
-        console.error("Password reset error:", error);
+        console.error(
+            "Password reset error:",
+            error
+        );
 
         showToast(
-            error?.message || "Unable to send password reset email.",
+            error?.message ||
+                "Unable to send password reset email.",
             "error"
         );
     }
@@ -407,14 +649,25 @@ async function handlePasswordReset(event) {
    RPC HELPER
    ========================================================= */
 
-async function callRpc(functionName, params = {}) {
-    const { data, error } = await supabase.rpc(
-        functionName,
-        params
-    );
+async function callRpc(
+    functionName,
+    params = {}
+) {
+    const {
+        data,
+        error
+    } =
+        await supabase.rpc(
+            functionName,
+            params
+        );
 
     if (error) {
-        console.error(`RPC ${functionName} failed:`, error);
+        console.error(
+            `RPC ${functionName} failed:`,
+            error
+        );
+
         throw error;
     }
 
@@ -428,47 +681,108 @@ async function callRpc(functionName, params = {}) {
 
 async function loadDashboard() {
     try {
-        const data = await callRpc("admin_dashboard_summary");
+        const data =
+            await callRpc(
+                "admin_dashboard_summary"
+            );
 
-        const summary = Array.isArray(data)
-            ? data[0]
-            : data || {};
+        const summary =
+            Array.isArray(data)
+                ? data[0] || {}
+                : data || {};
 
-        setText("#totalRooms", summary.total_rooms ?? 0);
-        setText("#totalBeds", summary.total_beds ?? 0);
-        setText("#occupiedBeds", summary.occupied_beds ?? 0);
-        setText("#availableBeds", summary.available_beds ?? 0);
-        setText("#activeHolds", summary.active_holds ?? 0);
-        setText("#activeAllocations", summary.active_allocations ?? 0);
+        setText(
+            "#totalRooms",
+            summary.total_rooms ?? 0
+        );
+
+        setText(
+            "#totalBeds",
+            summary.total_beds ?? 0
+        );
+
+        setText(
+            "#occupiedBeds",
+            summary.occupied_beds ?? 0
+        );
+
+        setText(
+            "#availableBeds",
+            summary.available_beds ?? 0
+        );
+
+        setText(
+            "#activeHolds",
+            summary.active_holds ?? 0
+        );
+
+        setText(
+            "#activeAllocations",
+            summary.active_allocations ?? 0
+        );
+
         setText(
             "#unallocatedStudents",
             summary.unallocated_students ?? 0
         );
 
-        const totalBeds = Number(summary.total_beds || 0);
-        const occupiedBeds = Number(summary.occupied_beds || 0);
-
-        let percentage = 0;
-
-        if (totalBeds > 0) {
-            percentage = Math.round(
-                (occupiedBeds / totalBeds) * 100
+        const totalBeds =
+            Number(
+                summary.total_beds || 0
             );
-        }
 
-        setText("#allocationStatus", `${percentage}% Allocated`);
-        setText("#lastUpdated", formatDate(new Date()));
+        const occupiedBeds =
+            Number(
+                summary.occupied_beds || 0
+            );
+
+        const percentage =
+            totalBeds > 0
+                ? Math.round(
+                    (
+                        occupiedBeds /
+                        totalBeds
+                    ) * 100
+                )
+                : 0;
+
+        setText(
+            "#allocationStatus",
+            `${percentage}% Allocated`
+        );
+
+        setText(
+            "#lastUpdated",
+            formatDate(
+                new Date()
+            )
+        );
     } catch (error) {
-        console.error("Dashboard load error:", error);
+        console.error(
+            "Dashboard load error:",
+            error
+        );
 
-        setText("#totalRooms", "—");
-        setText("#totalBeds", "—");
-        setText("#occupiedBeds", "—");
-        setText("#availableBeds", "—");
-        setText("#activeHolds", "—");
-        setText("#activeAllocations", "—");
-        setText("#unallocatedStudents", "—");
-        setText("#allocationStatus", "Unavailable");
+        [
+            "#totalRooms",
+            "#totalBeds",
+            "#occupiedBeds",
+            "#availableBeds",
+            "#activeHolds",
+            "#activeAllocations",
+            "#unallocatedStudents"
+        ].forEach(
+            (selector) =>
+                setText(
+                    selector,
+                    "—"
+                )
+        );
+
+        setText(
+            "#allocationStatus",
+            "Unavailable"
+        );
     }
 }
 
@@ -478,13 +792,15 @@ async function loadDashboard() {
    ========================================================= */
 
 async function loadRooms() {
-    const grid = $("#roomsGrid");
+    const grid =
+        $("#roomsGrid");
 
     if (!grid) {
         return;
     }
 
-    const block = $("#blockFilter")?.value || "";
+    const block =
+        $("#blockFilter")?.value || "";
 
     grid.innerHTML = `
         <div class="loading-state">
@@ -493,11 +809,19 @@ async function loadRooms() {
     `;
 
     try {
-        const data = await callRpc("admin_rooms", {
-            p_block: block || null
-        });
+        const data =
+            await callRpc(
+                "admin_rooms",
+                {
+                    p_block:
+                        block || null
+                }
+            );
 
-        const rooms = Array.isArray(data) ? data : [];
+        const rooms =
+            Array.isArray(data)
+                ? data
+                : [];
 
         if (!rooms.length) {
             grid.innerHTML = `
@@ -509,11 +833,15 @@ async function loadRooms() {
             return;
         }
 
-        grid.innerHTML = rooms
-            .map((room) => renderRoomCard(room))
-            .join("");
+        grid.innerHTML =
+            rooms
+                .map(renderRoomCard)
+                .join("");
     } catch (error) {
-        console.error("Rooms load error:", error);
+        console.error(
+            "Rooms load error:",
+            error
+        );
 
         grid.innerHTML = `
             <div class="error-state">
@@ -523,22 +851,36 @@ async function loadRooms() {
     }
 }
 
+
 function renderRoomCard(room) {
-    const capacity = Number(room.capacity || 0);
-    const occupied = Number(
-        room.occupied_beds ??
-        room.occupied ??
-        room.occupied_count ??
-        0
-    );
+    const capacity =
+        Number(
+            room.capacity || 0
+        );
 
-    const available = Math.max(capacity - occupied, 0);
+    const occupied =
+        Number(
+            room.occupied_beds ??
+            room.occupied ??
+            room.occupied_count ??
+            0
+        );
 
-    let status = "available";
+    const available =
+        Math.max(
+            capacity - occupied,
+            0
+        );
+
+    let status =
+        "available";
 
     if (room.temporarily_locked) {
         status = "locked";
-    } else if (available === 0 && capacity > 0) {
+    } else if (
+        available === 0 &&
+        capacity > 0
+    ) {
         status = "full";
     } else if (occupied > 0) {
         status = "partial";
@@ -557,7 +899,11 @@ function renderRoomCard(room) {
         >
             <div class="room-card-top">
                 <span class="room-code">
-                    ${escapeHtml(room.room_code || room.room_number || "Room")}
+                    ${escapeHtml(
+                        room.room_code ||
+                        room.room_number ||
+                        "Room"
+                    )}
                 </span>
 
                 <span class="room-status ${escapeHtml(status)}">
@@ -567,16 +913,27 @@ function renderRoomCard(room) {
 
             <div class="room-card-body">
                 <div class="room-number">
-                    ${escapeHtml(room.room_number || room.room_code || "—")}
+                    ${escapeHtml(
+                        room.room_number ||
+                        room.room_code ||
+                        "—"
+                    )}
                 </div>
 
                 <div class="room-meta">
                     <span>
-                        ${escapeHtml(room.block || "—")}
+                        ${escapeHtml(
+                            room.block ||
+                            "—"
+                        )}
                     </span>
 
                     <span>
-                        Floor ${escapeHtml(room.floor ?? "—")}
+                        Floor
+                        ${escapeHtml(
+                            room.floor ??
+                            "—"
+                        )}
                     </span>
                 </div>
 
@@ -599,27 +956,43 @@ function renderRoomCard(room) {
     `;
 }
 
+
+/* =========================================================
+   ROOM MODAL
+   ========================================================= */
+
 async function openRoomModal(roomId) {
     if (!roomId) {
         return;
     }
 
-    const modal = $("#roomModal");
-    const occupantsContainer = $("#roomOccupants");
+    const modal =
+        $("#roomModal");
 
-    if (!modal || !occupantsContainer) {
+    const occupantsContainer =
+        $("#roomOccupants");
+
+    if (
+        !modal ||
+        !occupantsContainer
+    ) {
         return;
     }
 
-    const roomTitle = $("#modalRoomTitle");
-    const roomSubtitle = $("#modalRoomSubtitle");
+    const roomTitle =
+        $("#modalRoomTitle");
+
+    const roomSubtitle =
+        $("#modalRoomSubtitle");
 
     if (roomTitle) {
-        roomTitle.textContent = "Room Occupants";
+        roomTitle.textContent =
+            "Room Occupants";
     }
 
     if (roomSubtitle) {
-        roomSubtitle.textContent = "Loading...";
+        roomSubtitle.textContent =
+            "Loading...";
     }
 
     occupantsContainer.innerHTML = `
@@ -632,14 +1005,23 @@ async function openRoomModal(roomId) {
     modal.style.display = "";
 
     try {
-        const data = await callRpc("admin_room_occupants", {
-            p_room_id: roomId
-        });
+        const data =
+            await callRpc(
+                "admin_room_occupants",
+                {
+                    p_room_id:
+                        roomId
+                }
+            );
 
-        const occupants = Array.isArray(data) ? data : [];
+        const occupants =
+            Array.isArray(data)
+                ? data
+                : [];
 
         if (occupants.length) {
-            const first = occupants[0];
+            const first =
+                occupants[0];
 
             if (roomTitle) {
                 roomTitle.textContent =
@@ -681,7 +1063,9 @@ async function openRoomModal(roomId) {
 
                                     <div>
                                         ${escapeHtml(
-                                            student.student_id || "—"
+                                            student.student_id ||
+                                            student.student_number ||
+                                            "—"
                                         )}
                                     </div>
                                 </div>
@@ -697,7 +1081,8 @@ async function openRoomModal(roomId) {
 
                                 <div>
                                     ${escapeHtml(
-                                        student.level || "—"
+                                        student.level ||
+                                        "—"
                                     )}
                                 </div>
                             </div>
@@ -707,7 +1092,10 @@ async function openRoomModal(roomId) {
             </div>
         `;
     } catch (error) {
-        console.error("Room occupants error:", error);
+        console.error(
+            "Room occupants error:",
+            error
+        );
 
         occupantsContainer.innerHTML = `
             <div class="error-state">
@@ -717,8 +1105,10 @@ async function openRoomModal(roomId) {
     }
 }
 
+
 function closeRoomModal() {
-    const modal = $("#roomModal");
+    const modal =
+        $("#roomModal");
 
     if (!modal) {
         return;
@@ -734,19 +1124,34 @@ function closeRoomModal() {
    ========================================================= */
 
 async function loadAllocations() {
-    const table = $("#allocationsTable");
+    const table =
+        $("#allocationsTable");
 
     if (!table) {
         return;
     }
 
-    const block = $("#allocationBlockFilter")?.value || "";
-    const gender = $("#genderFilter")?.value || "";
-    const search = $("#studentSearch")?.value.trim() || "";
+    const block =
+        $("#allocationBlockFilter")?.value ||
+        "";
 
-    const tbody =
-        table.querySelector("tbody") ||
-        table;
+    const gender =
+        $("#genderFilter")?.value ||
+        "";
+
+    const search =
+        $("#studentSearch")?.value.trim() ||
+        "";
+
+    let tbody =
+        table.querySelector("tbody");
+
+    if (!tbody) {
+        tbody =
+            document.createElement("tbody");
+
+        table.appendChild(tbody);
+    }
 
     tbody.innerHTML = `
         <tr>
@@ -757,13 +1162,23 @@ async function loadAllocations() {
     `;
 
     try {
-        const data = await callRpc("admin_student_allocations", {
-            p_search: search || null,
-            p_block: block || null,
-            p_gender: gender || null
-        });
+        const data =
+            await callRpc(
+                "admin_student_allocations",
+                {
+                    p_search:
+                        search || null,
+                    p_block:
+                        block || null,
+                    p_gender:
+                        gender || null
+                }
+            );
 
-        const allocations = Array.isArray(data) ? data : [];
+        const allocations =
+            Array.isArray(data)
+                ? data
+                : [];
 
         if (!allocations.length) {
             tbody.innerHTML = `
@@ -777,11 +1192,17 @@ async function loadAllocations() {
             return;
         }
 
-        tbody.innerHTML = allocations
-            .map((allocation) => renderAllocationRow(allocation))
-            .join("");
+        tbody.innerHTML =
+            allocations
+                .map(
+                    renderAllocationRow
+                )
+                .join("");
     } catch (error) {
-        console.error("Allocations load error:", error);
+        console.error(
+            "Allocations load error:",
+            error
+        );
 
         tbody.innerHTML = `
             <tr>
@@ -793,15 +1214,25 @@ async function loadAllocations() {
     }
 }
 
-function renderAllocationRow(allocation) {
+
+function renderAllocationRow(
+    allocation
+) {
     const allocationId =
         allocation.allocation_id ||
         allocation.id ||
         "";
 
+    const studentUuid =
+        allocation.student_uuid ||
+        allocation.student_id_uuid ||
+        allocation.student_pk ||
+        "";
+
     const studentId =
         allocation.student_id ||
-        allocation.student_uuid ||
+        allocation.student_number ||
+        studentUuid ||
         "";
 
     const studentName =
@@ -827,36 +1258,74 @@ function renderAllocationRow(allocation) {
         allocation.bed_label ||
         "—";
 
-    const block = allocation.block || "—";
-    const gender = allocation.gender || "—";
-    const level = allocation.level || "—";
-    const status = allocation.status || "active";
+    const block =
+        allocation.block ||
+        "—";
+
+    const gender =
+        allocation.gender ||
+        "—";
+
+    const level =
+        allocation.level ||
+        "—";
+
+    const status =
+        allocation.status ||
+        "active";
 
     return `
         <tr
             data-allocation-id="${escapeHtml(allocationId)}"
-            data-student-id="${escapeHtml(studentId)}"
+            data-student-id="${escapeHtml(studentUuid || studentId)}"
         >
             <td>
-                ${escapeHtml(allocation.allocation_number || "—")}
+                ${escapeHtml(
+                    allocation.allocation_number ||
+                    "—"
+                )}
             </td>
 
             <td>
-                <strong>${escapeHtml(studentName)}</strong>
-                <small>${escapeHtml(studentNumber)}</small>
+                <strong>
+                    ${escapeHtml(
+                        studentName
+                    )}
+                </strong>
+
+                <small>
+                    ${escapeHtml(
+                        studentNumber
+                    )}
+                </small>
             </td>
 
-            <td>${escapeHtml(level)}</td>
+            <td>
+                ${escapeHtml(level)}
+            </td>
 
-            <td>${escapeHtml(allocation.programme || "—")}</td>
+            <td>
+                ${escapeHtml(
+                    allocation.programme ||
+                    "—"
+                )}
+            </td>
 
-            <td>${escapeHtml(gender)}</td>
+            <td>
+                ${escapeHtml(gender)}
+            </td>
 
-            <td>${escapeHtml(block)}</td>
+            <td>
+                ${escapeHtml(block)}
+            </td>
 
-            <td>${escapeHtml(room)}</td>
+            <td>
+                ${escapeHtml(room)}
+            </td>
 
-            <td>${escapeHtml(bed)}</td>
+            <td>
+                ${escapeHtml(bed)}
+            </td>
 
             <td>
                 <span class="status-badge ${escapeHtml(
@@ -877,13 +1346,16 @@ function renderAllocationRow(allocation) {
 
             <td>
                 <div class="table-actions">
+
                     <button
                         type="button"
                         class="btn btn-small btn-secondary allocation-reassign"
                         data-allocation-id="${escapeHtml(allocationId)}"
-                        data-student-id="${escapeHtml(studentId)}"
+                        data-student-id="${escapeHtml(studentUuid || studentId)}"
                         data-current-bed-id="${escapeHtml(
-                            allocation.bed_id || ""
+                            allocation.bed_id ||
+                            allocation.current_bed_id ||
+                            ""
                         )}"
                     >
                         Reassign
@@ -904,6 +1376,7 @@ function renderAllocationRow(allocation) {
                             `
                             : ""
                     }
+
                 </div>
             </td>
         </tr>
@@ -915,100 +1388,34 @@ function renderAllocationRow(allocation) {
    AVAILABLE BEDS
    ========================================================= */
 
-async function getAvailableBeds(gender) {
-    const data = await callRpc("admin_available_beds", {
-        p_gender: gender || null
-    });
+async function getAvailableBeds(
+    gender
+) {
+    const data =
+        await callRpc(
+            "admin_available_beds",
+            {
+                p_gender:
+                    gender || null
+            }
+        );
 
-    return Array.isArray(data) ? data : [];
+    return Array.isArray(data)
+        ? data
+        : [];
 }
 
-function buildBedOptions(beds) {
+
+function buildBedOptions(
+    beds
+) {
     if (!beds.length) {
         return "";
     }
 
     return beds
-        .map((bed) => {
-            const bedId =
-                bed.bed_id ||
-                bed.id ||
-                "";
-
-            const room =
-                bed.room_code ||
-                bed.room_number ||
-                "Room";
-
-            const bedName =
-                bed.bed_code ||
-                bed.bed_number ||
-                bed.bed_label ||
-                bed.name ||
-                bedId;
-
-            const block = bed.block || "";
-            const floor =
-                bed.floor === null ||
-                bed.floor === undefined
-                    ? ""
-                    : `Floor ${bed.floor}`;
-
-            const labelParts = [
-                room,
-                bedName,
-                block,
-                floor
-            ].filter(Boolean);
-
-            return `
-                <option value="${escapeHtml(bedId)}">
-                    ${escapeHtml(labelParts.join(" · "))}
-                </option>
-            `;
-        })
-        .join("");
-}
-
-
-/* =========================================================
-   REASSIGN ALLOCATION
-   ========================================================= */
-
-async function reassignAllocation(allocationId, currentBedId) {
-    if (!allocationId) {
-        showToast("Allocation ID is missing.", "error");
-        return;
-    }
-
-    let gender = "";
-
-    const row = document.querySelector(
-        `tr[data-allocation-id="${CSS.escape(allocationId)}"]`
-    );
-
-    if (row) {
-        const cells = row.querySelectorAll("td");
-
-        if (cells.length >= 5) {
-            gender = cells[4]?.textContent.trim() || "";
-        }
-    }
-
-    try {
-        const beds = await getAvailableBeds(gender);
-
-        if (!beds.length) {
-            showToast(
-                "There are no available beds for this student.",
-                "error"
-            );
-
-            return;
-        }
-
-        const options = beds
-            .map((bed, index) => {
+        .map(
+            (bed) => {
                 const bedId =
                     bed.bed_id ||
                     bed.id ||
@@ -1023,45 +1430,163 @@ async function reassignAllocation(allocationId, currentBedId) {
                     bed.bed_code ||
                     bed.bed_number ||
                     bed.bed_label ||
-                    "Bed";
+                    bed.name ||
+                    bedId;
 
-                return `${index + 1}. ${room} · ${bedName} [${bedId}]`;
-            })
-            .join("\n");
+                const block =
+                    bed.block || "";
 
-        const answer = window.prompt(
-            `Select the new bed by entering its number:\n\n${options}`
+                const floor =
+                    bed.floor === null ||
+                    bed.floor === undefined
+                        ? ""
+                        : `Floor ${bed.floor}`;
+
+                const label =
+                    [
+                        room,
+                        bedName,
+                        block,
+                        floor
+                    ]
+                        .filter(Boolean)
+                        .join(" · ");
+
+                return `
+                    <option
+                        value="${escapeHtml(bedId)}"
+                    >
+                        ${escapeHtml(label)}
+                    </option>
+                `;
+            }
+        )
+        .join("");
+}
+
+
+/* =========================================================
+   REASSIGN
+   ========================================================= */
+
+async function reassignAllocation(
+    allocationId,
+    currentBedId
+) {
+    if (!allocationId) {
+        showToast(
+            "Allocation ID is missing.",
+            "error"
         );
+
+        return;
+    }
+
+    let gender = "";
+
+    const row =
+        document.querySelector(
+            `tr[data-allocation-id="${CSS.escape(
+                allocationId
+            )}"]`
+        );
+
+    if (row) {
+        const cells =
+            row.querySelectorAll("td");
+
+        if (cells.length >= 5) {
+            gender =
+                cells[4]?.textContent.trim() ||
+                "";
+        }
+    }
+
+    try {
+        const beds =
+            await getAvailableBeds(
+                gender
+            );
+
+        if (!beds.length) {
+            showToast(
+                "There are no available beds for this student.",
+                "error"
+            );
+
+            return;
+        }
+
+        const options =
+            beds
+                .map(
+                    (bed, index) => {
+                        const room =
+                            bed.room_code ||
+                            bed.room_number ||
+                            "Room";
+
+                        const bedName =
+                            bed.bed_code ||
+                            bed.bed_number ||
+                            bed.bed_label ||
+                            "Bed";
+
+                        return (
+                            `${index + 1}. ` +
+                            `${room} · ` +
+                            `${bedName}`
+                        );
+                    }
+                )
+                .join("\n");
+
+        const answer =
+            window.prompt(
+                `Select the new bed by entering its number:\n\n${options}`
+            );
 
         if (answer === null) {
             return;
         }
 
-        const index = Number(answer) - 1;
+        const index =
+            Number(answer) - 1;
 
         if (
             !Number.isInteger(index) ||
             index < 0 ||
             index >= beds.length
         ) {
-            showToast("Invalid bed selection.", "error");
+            showToast(
+                "Invalid bed selection.",
+                "error"
+            );
+
             return;
         }
 
-        const selectedBed = beds[index];
+        const selectedBed =
+            beds[index];
 
         const newBedId =
             selectedBed.bed_id ||
-            selectedBed.id;
+            selectedBed.id ||
+            "";
 
         if (!newBedId) {
-            showToast("Selected bed has no valid ID.", "error");
+            showToast(
+                "Selected bed has no valid ID.",
+                "error"
+            );
+
             return;
         }
 
         if (
             currentBedId &&
-            String(currentBedId) === String(newBedId)
+            String(currentBedId) ===
+                String(newBedId)
         ) {
             showToast(
                 "Please select a different bed.",
@@ -1071,24 +1596,36 @@ async function reassignAllocation(allocationId, currentBedId) {
             return;
         }
 
-        const confirmed = window.confirm(
-            "Are you sure you want to reassign this student to the selected bed?"
-        );
+        const confirmed =
+            window.confirm(
+                "Are you sure you want to reassign this student to the selected bed?"
+            );
 
         if (!confirmed) {
             return;
         }
 
-        await callRpc("reassign_student", {
-            p_allocation_id: allocationId,
-            p_new_bed_id: newBedId
-        });
+        await callRpc(
+            "reassign_student",
+            {
+                p_allocation_id:
+                    allocationId,
 
-        showToast("Student successfully reassigned.");
+                p_new_bed_id:
+                    newBedId
+            }
+        );
+
+        showToast(
+            "Student successfully reassigned."
+        );
 
         await loadEverything();
     } catch (error) {
-        console.error("Reassignment error:", error);
+        console.error(
+            "Reassignment error:",
+            error
+        );
 
         showToast(
             error?.message ||
@@ -1103,9 +1640,15 @@ async function reassignAllocation(allocationId, currentBedId) {
    UNASSIGN
    ========================================================= */
 
-async function unassignAllocation(allocationId) {
+async function unassignAllocation(
+    allocationId
+) {
     if (!allocationId) {
-        showToast("Allocation ID is missing.", "error");
+        showToast(
+            "Allocation ID is missing.",
+            "error"
+        );
+
         return;
     }
 
@@ -1118,24 +1661,34 @@ async function unassignAllocation(allocationId) {
         return;
     }
 
-    const confirmed = window.confirm(
-        "Are you sure you want to unassign this student?\n\nThis will remove the current room allocation."
-    );
+    const confirmed =
+        window.confirm(
+            "Are you sure you want to unassign this student?\n\nThis will remove the current room allocation."
+        );
 
     if (!confirmed) {
         return;
     }
 
     try {
-        await callRpc("unassign_student", {
-            p_allocation_id: allocationId
-        });
+        await callRpc(
+            "unassign_student",
+            {
+                p_allocation_id:
+                    allocationId
+            }
+        );
 
-        showToast("Student successfully unassigned.");
+        showToast(
+            "Student successfully unassigned."
+        );
 
         await loadEverything();
     } catch (error) {
-        console.error("Unassign error:", error);
+        console.error(
+            "Unassign error:",
+            error
+        );
 
         showToast(
             error?.message ||
@@ -1147,22 +1700,71 @@ async function unassignAllocation(allocationId) {
 
 
 /* =========================================================
-   UNALLOCATED STUDENTS
+   UNALLOCATED TABLE
    ========================================================= */
 
+/*
+ * This is deliberately defensive.
+ *
+ * If the HTML contains:
+ *
+ * <table id="unallocatedTable"></table>
+ *
+ * but no tbody, this function creates it automatically.
+ *
+ * Therefore the JavaScript no longer depends on a manually
+ * created #unallocatedTableBody.
+ */
+function getUnallocatedTableBody() {
+    let tbody =
+        $("#unallocatedTableBody");
+
+    if (tbody) {
+        return tbody;
+    }
+
+    const table =
+        $("#unallocatedTable");
+
+    if (!table) {
+        return null;
+    }
+
+    tbody =
+        table.querySelector("tbody");
+
+    if (!tbody) {
+        tbody =
+            document.createElement("tbody");
+
+        tbody.id =
+            "unallocatedTableBody";
+
+        table.appendChild(tbody);
+    } else {
+        tbody.id =
+            "unallocatedTableBody";
+    }
+
+    return tbody;
+}
+
+
 async function loadUnallocated() {
-    const tbody = $("#unallocatedTableBody");
+    const tbody =
+        getUnallocatedTableBody();
 
     if (!tbody) {
         console.warn(
-            "Element #unallocatedTableBody was not found."
+            "The unallocated students table could not be found."
         );
 
         return;
     }
 
     const search =
-        $("#unallocatedSearch")?.value.trim() || "";
+        $("#unallocatedSearch")?.value.trim() ||
+        "";
 
     tbody.innerHTML = `
         <tr>
@@ -1173,14 +1775,19 @@ async function loadUnallocated() {
     `;
 
     try {
-        const data = await callRpc(
-            "admin_unallocated_students",
-            {
-                p_search: search || null
-            }
-        );
+        const data =
+            await callRpc(
+                "admin_unallocated_students",
+                {
+                    p_search:
+                        search || null
+                }
+            );
 
-        const students = Array.isArray(data) ? data : [];
+        const students =
+            Array.isArray(data)
+                ? data
+                : [];
 
         console.log(
             "Unallocated students returned:",
@@ -1204,9 +1811,12 @@ async function loadUnallocated() {
             return;
         }
 
-        tbody.innerHTML = students
-            .map((student) => renderUnallocatedRow(student))
-            .join("");
+        tbody.innerHTML =
+            students
+                .map(
+                    renderUnallocatedRow
+                )
+                .join("");
     } catch (error) {
         console.error(
             "Unallocated students load error:",
@@ -1229,15 +1839,55 @@ async function loadUnallocated() {
     }
 }
 
-function renderUnallocatedRow(student) {
-    const studentId =
+
+function renderUnallocatedRow(
+    student
+) {
+    /*
+     * IMPORTANT:
+     *
+     * student_uuid / id may be the actual UUID required
+     * by admin_assign_student().
+     *
+     * student_id may instead be the human-readable
+     * matriculation/student number.
+     */
+    const studentUuid =
+        student.student_uuid ||
+        student.student_id_uuid ||
+        student.student_pk ||
+        (
+            typeof student.id === "string" &&
+            student.id.includes("-")
+                ? student.id
+                : ""
+        );
+
+    const studentNumber =
+        student.student_number ||
+        student.student_code ||
+        student.student_id_number ||
+        (
+            student.student_id &&
+            !String(
+                student.student_id
+            ).includes("-")
+                ? student.student_id
+                : ""
+        ) ||
+        "—";
+
+    const rowId =
+        studentUuid ||
         student.student_id ||
         student.id ||
+        studentNumber ||
         "";
 
     const studentName =
         student.student_name ||
         student.full_name ||
+        student.name ||
         "—";
 
     const level =
@@ -1260,8 +1910,20 @@ function renderUnallocatedRow(student) {
         student.email ||
         "—";
 
+    /*
+     * Use UUID where available.
+     * If the RPC returns id as the UUID, use it.
+     */
+    const assignId =
+        studentUuid ||
+        student.id ||
+        student.student_id ||
+        "";
+
     return `
-        <tr data-student-id="${escapeHtml(studentId)}">
+        <tr
+            data-student-id="${escapeHtml(assignId)}"
+        >
 
             <td>
                 <strong>
@@ -1270,7 +1932,7 @@ function renderUnallocatedRow(student) {
             </td>
 
             <td>
-                ${escapeHtml(studentId)}
+                ${escapeHtml(studentNumber)}
             </td>
 
             <td>
@@ -1297,7 +1959,9 @@ function renderUnallocatedRow(student) {
                 <button
                     type="button"
                     class="btn btn-small btn-primary assign-unallocated"
-                    data-student-id="${escapeHtml(studentId)}"
+                    data-student-id="${escapeHtml(assignId)}"
+                    data-student-number="${escapeHtml(studentNumber)}"
+                    data-student-gender="${escapeHtml(gender)}"
                 >
                     Assign Room
                 </button>
@@ -1312,29 +1976,57 @@ function renderUnallocatedRow(student) {
    ASSIGN UNALLOCATED STUDENT
    ========================================================= */
 
-async function assignUnallocatedStudent(studentId) {
+async function assignUnallocatedStudent(
+    studentId,
+    genderFromButton = ""
+) {
     if (!studentId) {
-        showToast("Student ID is missing.", "error");
+        showToast(
+            "Student ID is missing.",
+            "error"
+        );
+
         return;
     }
 
     try {
-        const studentRow = document.querySelector(
-            `tr[data-student-id="${CSS.escape(studentId)}"]`
-        );
+        const button =
+            document.querySelector(
+                `.assign-unallocated[data-student-id="${CSS.escape(
+                    studentId
+                )}"]`
+            );
 
-        let gender = "";
+        const studentRow =
+            button?.closest("tr");
 
-        if (studentRow) {
-            const cells = studentRow.querySelectorAll("td");
+        let gender =
+            genderFromButton || "";
+
+        if (!gender && button) {
+            gender =
+                button.dataset.studentGender ||
+                "";
+        }
+
+        if (!gender && studentRow) {
+            const cells =
+                studentRow.querySelectorAll("td");
 
             if (cells.length >= 5) {
                 gender =
-                    cells[4]?.textContent.trim() || "";
+                    cells[4]?.textContent.trim() ||
+                    "";
             }
         }
 
-        let beds = await getAvailableBeds(gender);
+        /*
+         * Ask backend for beds matching the student's gender.
+         */
+        const beds =
+            await getAvailableBeds(
+                gender
+            );
 
         if (!beds.length) {
             showToast(
@@ -1345,35 +2037,50 @@ async function assignUnallocatedStudent(studentId) {
             return;
         }
 
-        const options = beds
-            .map((bed, index) => {
-                const room =
-                    bed.room_code ||
-                    bed.room_number ||
-                    "Room";
+        const options =
+            beds
+                .map(
+                    (bed, index) => {
+                        const room =
+                            bed.room_code ||
+                            bed.room_number ||
+                            "Room";
 
-                const bedName =
-                    bed.bed_code ||
-                    bed.bed_number ||
-                    bed.bed_label ||
-                    "Bed";
+                        const bedName =
+                            bed.bed_code ||
+                            bed.bed_number ||
+                            bed.bed_label ||
+                            "Bed";
 
-                const block =
-                    bed.block || "";
+                        const block =
+                            bed.block ||
+                            "";
 
-                return `${index + 1}. ${room} · ${bedName}${block ? ` · ${block}` : ""}`;
-            })
-            .join("\n");
+                        return (
+                            `${index + 1}. ` +
+                            `${room} · ` +
+                            `${bedName}` +
+                            (
+                                block
+                                    ? ` · ${block}`
+                                    : ""
+                            )
+                        );
+                    }
+                )
+                .join("\n");
 
-        const answer = window.prompt(
-            `Select the bed to assign:\n\n${options}`
-        );
+        const answer =
+            window.prompt(
+                `Select the bed to assign:\n\n${options}`
+            );
 
         if (answer === null) {
             return;
         }
 
-        const index = Number(answer) - 1;
+        const index =
+            Number(answer) - 1;
 
         if (
             !Number.isInteger(index) ||
@@ -1388,11 +2095,13 @@ async function assignUnallocatedStudent(studentId) {
             return;
         }
 
-        const selectedBed = beds[index];
+        const selectedBed =
+            beds[index];
 
         const bedId =
             selectedBed.bed_id ||
-            selectedBed.id;
+            selectedBed.id ||
+            "";
 
         if (!bedId) {
             showToast(
@@ -1403,18 +2112,25 @@ async function assignUnallocatedStudent(studentId) {
             return;
         }
 
-        const confirmed = window.confirm(
-            "Assign this student to the selected bed?"
-        );
+        const confirmed =
+            window.confirm(
+                "Assign this student to the selected bed?"
+            );
 
         if (!confirmed) {
             return;
         }
 
-        await callRpc("admin_assign_student", {
-            p_student_id: studentId,
-            p_bed_id: bedId
-        });
+        await callRpc(
+            "admin_assign_student",
+            {
+                p_student_id:
+                    studentId,
+
+                p_bed_id:
+                    bedId
+            }
+        );
 
         showToast(
             "Student successfully assigned."
@@ -1441,15 +2157,22 @@ async function assignUnallocatedStudent(studentId) {
    ========================================================= */
 
 async function loadAuditLogs() {
-    const table = $("#auditTable");
+    const table =
+        $("#auditTable");
 
     if (!table) {
         return;
     }
 
-    const tbody =
-        table.querySelector("tbody") ||
-        table;
+    let tbody =
+        table.querySelector("tbody");
+
+    if (!tbody) {
+        tbody =
+            document.createElement("tbody");
+
+        table.appendChild(tbody);
+    }
 
     tbody.innerHTML = `
         <tr>
@@ -1460,16 +2183,18 @@ async function loadAuditLogs() {
     `;
 
     try {
-        const data = await callRpc(
-            "admin_audit_logs",
-            {
-                p_limit: 100
-            }
-        );
+        const data =
+            await callRpc(
+                "admin_audit_logs",
+                {
+                    p_limit: 100
+                }
+            );
 
-        const logs = Array.isArray(data)
-            ? data
-            : [];
+        const logs =
+            Array.isArray(data)
+                ? data
+                : [];
 
         if (!logs.length) {
             tbody.innerHTML = `
@@ -1483,56 +2208,68 @@ async function loadAuditLogs() {
             return;
         }
 
-        tbody.innerHTML = logs
-            .map((log) => {
-                return `
-                    <tr>
-                        <td>
-                            ${escapeHtml(
-                                formatDate(
-                                    log.created_at ||
-                                    log.timestamp
-                                )
-                            )}
-                        </td>
+        tbody.innerHTML =
+            logs
+                .map(
+                    (log) => `
+                        <tr>
 
-                        <td>
-                            ${escapeHtml(
-                                log.action ||
-                                log.event ||
-                                "—"
-                            )}
-                        </td>
+                            <td>
+                                ${escapeHtml(
+                                    formatDate(
+                                        log.created_at ||
+                                        log.timestamp
+                                    )
+                                )}
+                            </td>
 
-                        <td>
-                            ${escapeHtml(
-                                log.actor_email ||
-                                log.user_email ||
-                                "—"
-                            )}
-                        </td>
+                            <td>
+                                ${escapeHtml(
+                                    log.action ||
+                                    log.event ||
+                                    "—"
+                                )}
+                            </td>
 
-                        <td>
-                            ${escapeHtml(
-                                log.target ||
-                                log.target_type ||
-                                "—"
-                            )}
-                        </td>
+                            <td>
+                                ${escapeHtml(
+                                    log.actor_email ||
+                                    log.user_email ||
+                                    "—"
+                                )}
+                            </td>
 
-                        <td>
-                            ${escapeHtml(
-                                log.details ||
-                                log.description ||
-                                ""
-                            )}
-                        </td>
-                    </tr>
-                `;
-            })
-            .join("");
+                            <td>
+                                ${escapeHtml(
+                                    log.target ||
+                                    log.target_type ||
+                                    "—"
+                                )}
+                            </td>
+
+                            <td>
+                                ${escapeHtml(
+                                    typeof log.details === "object"
+                                        ? JSON.stringify(
+                                            log.details
+                                        )
+                                        : (
+                                            log.details ||
+                                            log.description ||
+                                            ""
+                                        )
+                                )}
+                            </td>
+
+                        </tr>
+                    `
+                )
+                .join("");
     } catch (error) {
-        console.error("Audit log error:", error);
+        console.error(
+            "Audit log error:",
+            error
+        );
 
         tbody.innerHTML = `
             <tr>
@@ -1550,35 +2287,55 @@ async function loadAuditLogs() {
    ========================================================= */
 
 async function loadEverything() {
-    setText("#lastUpdated", "Refreshing...");
+    setText(
+        "#lastUpdated",
+        "Refreshing..."
+    );
 
-    const results = await Promise.allSettled([
-        loadDashboard(),
-        loadRooms(),
-        loadAllocations(),
-        loadUnallocated(),
-        loadAuditLogs()
-    ]);
+    const results =
+        await Promise.allSettled([
+            loadDashboard(),
+            loadRooms(),
+            loadAllocations(),
+            loadUnallocated(),
+            loadAuditLogs()
+        ]);
 
-    results.forEach((result, index) => {
-        if (result.status === "rejected") {
-            console.error(
-                `Admin section ${index} failed:`,
-                result.reason
-            );
+    results.forEach(
+        (result, index) => {
+            if (
+                result.status ===
+                "rejected"
+            ) {
+                console.error(
+                    `Admin section ${index} failed:`,
+                    result.reason
+                );
+            }
         }
-    });
+    );
 
-    setText("#lastUpdated", formatDate(new Date()));
+    setText(
+        "#lastUpdated",
+        formatDate(
+            new Date()
+        )
+    );
 }
 
 
 /* =========================================================
-   CSV EXPORT
+   CSV
    ========================================================= */
 
-function downloadCsv(filename, rows) {
-    if (!rows || !rows.length) {
+function downloadCsv(
+    filename,
+    rows
+) {
+    if (
+        !rows ||
+        !rows.length
+    ) {
         showToast(
             "There is no data to export.",
             "error"
@@ -1587,54 +2344,74 @@ function downloadCsv(filename, rows) {
         return;
     }
 
-    const csv = rows
-        .map((row) =>
-            row
-                .map((value) => csvEscape(value))
-                .join(",")
-        )
-        .join("\r\n");
+    const csv =
+        rows
+            .map(
+                (row) =>
+                    row
+                        .map(csvEscape)
+                        .join(",")
+            )
+            .join("\r\n");
 
-    const blob = new Blob(
-        [csv],
-        {
-            type: "text/csv;charset=utf-8;"
-        }
-    );
+    const blob =
+        new Blob(
+            [csv],
+            {
+                type:
+                    "text/csv;charset=utf-8;"
+            }
+        );
 
-    const url = URL.createObjectURL(blob);
+    const url =
+        URL.createObjectURL(
+            blob
+        );
 
-    const link = document.createElement("a");
+    const link =
+        document.createElement("a");
 
     link.href = url;
     link.download = filename;
 
     document.body.appendChild(link);
+
     link.click();
+
     link.remove();
 
     URL.revokeObjectURL(url);
 }
 
+
 async function exportAllocations() {
     try {
         const block =
-            $("#allocationBlockFilter")?.value || "";
+            $("#allocationBlockFilter")?.value ||
+            "";
 
         const gender =
-            $("#genderFilter")?.value || "";
+            $("#genderFilter")?.value ||
+            "";
 
         const search =
-            $("#studentSearch")?.value.trim() || "";
+            $("#studentSearch")?.value.trim() ||
+            "";
 
-        const data = await callRpc(
-            "admin_student_allocations",
-            {
-                p_search: search || null,
-                p_block: block || null,
-                p_gender: gender || null
-            }
-        );
+        const data =
+            await callRpc(
+                "admin_student_allocations",
+                {
+                    p_search:
+                        search || null,
+
+                    p_block:
+                        block || null,
+
+                    p_gender:
+                        gender || null
+                }
+            );
 
         const allocations =
             Array.isArray(data)
@@ -1657,31 +2434,33 @@ async function exportAllocations() {
             ]
         ];
 
-        allocations.forEach((item) => {
-            rows.push([
-                item.allocation_number || "",
-                item.student_name || "",
-                item.student_number ||
-                    item.student_id_number ||
-                    item.student_id ||
-                    "",
-                item.level || "",
-                item.programme || "",
-                item.gender || "",
-                item.block || "",
-                item.room_code ||
-                    item.room_number ||
-                    "",
-                item.bed_code ||
-                    item.bed_number ||
-                    "",
-                item.status || "",
-                formatDate(
-                    item.allocated_at ||
-                    item.created_at
-                )
-            ]);
-        });
+        allocations.forEach(
+            (item) => {
+                rows.push([
+                    item.allocation_number || "",
+                    item.student_name || "",
+                    item.student_number ||
+                        item.student_id_number ||
+                        item.student_id ||
+                        "",
+                    item.level || "",
+                    item.programme || "",
+                    item.gender || "",
+                    item.block || "",
+                    item.room_code ||
+                        item.room_number ||
+                        "",
+                    item.bed_code ||
+                        item.bed_number ||
+                        "",
+                    item.status || "",
+                    formatDate(
+                        item.allocated_at ||
+                        item.created_at
+                    )
+                ]);
+            }
+        );
 
         downloadCsv(
             "uhas-asogli-hall-allocations.csv",
@@ -1704,17 +2483,21 @@ async function exportAllocations() {
     }
 }
 
+
 async function exportUnallocated() {
     try {
         const search =
-            $("#unallocatedSearch")?.value.trim() || "";
+            $("#unallocatedSearch")?.value.trim() ||
+            "";
 
-        const data = await callRpc(
-            "admin_unallocated_students",
-            {
-                p_search: search || null
-            }
-        );
+        const data =
+            await callRpc(
+                "admin_unallocated_students",
+                {
+                    p_search:
+                        search || null
+                }
+            );
 
         const students =
             Array.isArray(data)
@@ -1733,21 +2516,30 @@ async function exportUnallocated() {
             ]
         ];
 
-        students.forEach((student) => {
-            rows.push([
-                student.student_name ||
-                    student.full_name ||
-                    "",
-                student.student_id ||
-                    student.id ||
-                    "",
-                student.level || "",
-                student.programme || "",
-                student.gender || "",
-                student.priority_group || "",
-                student.email || ""
-            ]);
-        });
+        students.forEach(
+            (student) => {
+                rows.push([
+                    student.student_name ||
+                        student.full_name ||
+                        "",
+
+                    student.student_number ||
+                        student.student_id ||
+                        student.id ||
+                        "",
+
+                    student.level || "",
+
+                    student.programme || "",
+
+                    student.gender || "",
+
+                    student.priority_group || "",
+
+                    student.email || ""
+                ]);
+            }
+        );
 
         downloadCsv(
             "uhas-asogli-hall-unallocated-students.csv",
@@ -1770,6 +2562,7 @@ async function exportUnallocated() {
     }
 }
 
+
 function printReport() {
     window.print();
 }
@@ -1779,40 +2572,56 @@ function printReport() {
    NAVIGATION
    ========================================================= */
 
-function activateSection(sectionId) {
-    const sections = $$(".admin-section");
-    const navItems = $$(".nav-item[data-section]");
+function activateSection(
+    sectionId
+) {
+    const sections =
+        $$(".admin-section");
 
-    sections.forEach((section) => {
-        const matches =
-            section.id === sectionId;
+    const navItems =
+        $$(".nav-item[data-section]");
 
-        section.classList.toggle(
-            "active",
-            matches
-        );
+    sections.forEach(
+        (section) => {
+            const matches =
+                section.id === sectionId;
 
-        if (matches) {
-            section.style.display = "";
-        } else {
-            section.style.display = "none";
+            section.classList.toggle(
+                "active",
+                matches
+            );
+
+            section.style.display =
+                matches
+                    ? ""
+                    : "none";
         }
-    });
-
-    navItems.forEach((item) => {
-        item.classList.toggle(
-            "active",
-            item.dataset.section === sectionId
-        );
-    });
-
-    const pageTitle = $("#pageTitle");
-
-    const activeNav = document.querySelector(
-        `.nav-item[data-section="${CSS.escape(sectionId)}"]`
     );
 
-    if (pageTitle && activeNav) {
+    navItems.forEach(
+        (item) => {
+            item.classList.toggle(
+                "active",
+                item.dataset.section ===
+                    sectionId
+            );
+        }
+    );
+
+    const pageTitle =
+        $("#pageTitle");
+
+    const activeNav =
+        document.querySelector(
+            `.nav-item[data-section="${CSS.escape(
+                sectionId
+            )}"]`
+        );
+
+    if (
+        pageTitle &&
+        activeNav
+    ) {
         pageTitle.textContent =
             activeNav.dataset.title ||
             activeNav.textContent.trim();
@@ -1822,30 +2631,73 @@ function activateSection(sectionId) {
         $("#adminSidebar");
 
     if (sidebar) {
-        sidebar.classList.remove("open");
+        sidebar.classList.remove(
+            "open"
+        );
     }
 }
 
+
 function initialiseNavigation() {
-    $$(".nav-item[data-section]").forEach((item) => {
-        item.addEventListener("click", (event) => {
-            event.preventDefault();
+    $$(".nav-item[data-section]")
+        .forEach(
+            (item) => {
+                if (
+                    item.dataset.navigationAttached
+                ) {
+                    return;
+                }
 
-            const sectionId =
-                item.dataset.section;
+                item.dataset.navigationAttached =
+                    "true";
 
-            if (!sectionId) {
-                return;
+                item.addEventListener(
+                    "click",
+                    (event) => {
+                        event.preventDefault();
+
+                        const sectionId =
+                            item.dataset.section;
+
+                        if (!sectionId) {
+                            return;
+                        }
+
+                        /*
+                         * Do not allow non-super-admins
+                         * into administrator management.
+                         */
+                        if (
+                            sectionId ===
+                                "adminManagementSection" &&
+                            !isSuperAdmin()
+                        ) {
+                            showToast(
+                                "Only a Super Admin can access administrator management.",
+                                "error"
+                            );
+
+                            return;
+                        }
+
+                        activateSection(
+                            sectionId
+                        );
+                    }
+                );
             }
-
-            activateSection(sectionId);
-        });
-    });
+        );
 
     const menuButton =
         $("#mobileMenuButton");
 
-    if (menuButton) {
+    if (
+        menuButton &&
+        !menuButton.dataset.eventsAttached
+    ) {
+        menuButton.dataset.eventsAttached =
+            "true";
+
         menuButton.addEventListener(
             "click",
             () => {
@@ -1869,19 +2721,31 @@ function initialiseNavigation() {
 
 async function initialiseAdminManagement() {
     if (!isSuperAdmin()) {
-        hideElement("#adminManagementSection");
-        hideElement("#administratorsNavItem");
+        hideElement(
+            "#adminManagementSection"
+        );
+
+        hideElement(
+            "#administratorsNavItem"
+        );
+
         return;
     }
 
-    showElement("#administratorsNavItem");
+    showElement(
+        "#administratorsNavItem"
+    );
 
-    if (adminManagementInitialised) {
+    if (
+        adminManagementInitialised
+    ) {
         await loadAdministrators();
+
         return;
     }
 
-    adminManagementInitialised = true;
+    adminManagementInitialised =
+        true;
 
     const addButton =
         $("#addAdminButton");
@@ -1926,6 +2790,7 @@ async function initialiseAdminManagement() {
     await loadAdministrators();
 }
 
+
 async function loadAdministrators() {
     if (!isSuperAdmin()) {
         return;
@@ -1947,7 +2812,10 @@ async function loadAdministrators() {
     `;
 
     try {
-        const { data, error } =
+        const {
+            data,
+            error
+        } =
             await supabase.functions.invoke(
                 "admin-management",
                 {
@@ -1964,7 +2832,9 @@ async function loadAdministrators() {
         const administrators =
             Array.isArray(data)
                 ? data
-                : Array.isArray(data?.administrators)
+                : Array.isArray(
+                    data?.administrators
+                )
                     ? data.administrators
                     : [];
 
@@ -1985,15 +2855,18 @@ async function loadAdministrators() {
                 .map(
                     (admin) => `
                         <tr>
+
                             <td>
                                 ${escapeHtml(
-                                    admin.email || "—"
+                                    admin.email ||
+                                    "—"
                                 )}
                             </td>
 
                             <td>
                                 ${escapeHtml(
-                                    admin.role || "admin"
+                                    admin.role ||
+                                    "admin"
                                 )}
                             </td>
 
@@ -2017,10 +2890,12 @@ async function loadAdministrators() {
                                             ""
                                         )}"
                                         data-admin-email="${escapeHtml(
-                                            admin.email || ""
+                                            admin.email ||
+                                            ""
                                         )}"
                                         data-admin-role="${escapeHtml(
-                                            admin.role || "admin"
+                                            admin.role ||
+                                            "admin"
                                         )}"
                                     >
                                         Edit
@@ -2035,7 +2910,8 @@ async function loadAdministrators() {
                                             ""
                                         )}"
                                         data-admin-email="${escapeHtml(
-                                            admin.email || ""
+                                            admin.email ||
+                                            ""
                                         )}"
                                     >
                                         Remove
@@ -2043,6 +2919,7 @@ async function loadAdministrators() {
 
                                 </div>
                             </td>
+
                         </tr>
                     `
                 )
@@ -2063,7 +2940,10 @@ async function loadAdministrators() {
     }
 }
 
-function openAdminModal(admin = null) {
+
+function openAdminModal(
+    admin = null
+) {
     if (!isSuperAdmin()) {
         showToast(
             "Only a Super Admin can manage administrators.",
@@ -2079,7 +2959,10 @@ function openAdminModal(admin = null) {
     const form =
         $("#adminForm");
 
-    if (!modal || !form) {
+    if (
+        !modal ||
+        !form
+    ) {
         return;
     }
 
@@ -2087,25 +2970,40 @@ function openAdminModal(admin = null) {
 
     setText(
         "#adminModalTitle",
-        admin ? "Edit Administrator" : "Add Administrator"
+        admin
+            ? "Edit Administrator"
+            : "Add Administrator"
     );
 
-    if ($("#adminEmail")) {
-        $("#adminEmail").value =
+    const emailInput =
+        $("#adminEmail");
+
+    if (emailInput) {
+        emailInput.value =
             admin?.email || "";
     }
 
-    if ($("#adminRoleSelect")) {
-        $("#adminRoleSelect").value =
-            admin?.role || "admin";
+    const roleSelect =
+        $("#adminRoleSelect");
+
+    if (roleSelect) {
+        roleSelect.value =
+            admin?.role ||
+            "admin";
     }
 
-    if ($("#adminPassword")) {
-        $("#adminPassword").value = "";
+    const passwordInput =
+        $("#adminPassword");
+
+    if (passwordInput) {
+        passwordInput.value = "";
     }
 
-    if ($("#adminFormError")) {
-        $("#adminFormError").textContent = "";
+    const formError =
+        $("#adminFormError");
+
+    if (formError) {
+        formError.textContent = "";
     }
 
     form.dataset.adminId =
@@ -2113,9 +3011,13 @@ function openAdminModal(admin = null) {
         admin?.user_id ||
         "";
 
-    modal.classList.add("open");
+    modal.classList.add(
+        "open"
+    );
+
     modal.style.display = "";
 }
+
 
 function closeAdminModal() {
     const modal =
@@ -2125,11 +3027,18 @@ function closeAdminModal() {
         return;
     }
 
-    modal.classList.remove("open");
-    modal.style.display = "none";
+    modal.classList.remove(
+        "open"
+    );
+
+    modal.style.display =
+        "none";
 }
 
-async function handleAdminFormSubmit(event) {
+
+async function handleAdminFormSubmit(
+    event
+) {
     event.preventDefault();
 
     if (!isSuperAdmin()) {
@@ -2174,9 +3083,13 @@ async function handleAdminFormSubmit(event) {
     }
 
     const adminId =
-        form?.dataset.adminId || "";
+        form?.dataset.adminId ||
+        "";
 
-    if (!adminId && !password) {
+    if (
+        !adminId &&
+        !password
+    ) {
         if (errorElement) {
             errorElement.textContent =
                 "Password is required for a new administrator.";
@@ -2193,7 +3106,9 @@ async function handleAdminFormSubmit(event) {
 
     try {
         const action =
-            adminId ? "update" : "create";
+            adminId
+                ? "update"
+                : "create";
 
         const payload = {
             action,
@@ -2202,14 +3117,19 @@ async function handleAdminFormSubmit(event) {
         };
 
         if (adminId) {
-            payload.user_id = adminId;
+            payload.user_id =
+                adminId;
         }
 
         if (password) {
-            payload.password = password;
+            payload.password =
+                password;
         }
 
-        const { data, error } =
+        const {
+            data,
+            error
+        } =
             await supabase.functions.invoke(
                 "admin-management",
                 {
@@ -2222,7 +3142,9 @@ async function handleAdminFormSubmit(event) {
         }
 
         if (data?.error) {
-            throw new Error(data.error);
+            throw new Error(
+                data.error
+            );
         }
 
         closeAdminModal();
@@ -2253,77 +3175,6 @@ async function handleAdminFormSubmit(event) {
     }
 }
 
-async function changeAdministratorRole(
-    adminId,
-    email,
-    currentRole
-) {
-    if (!isSuperAdmin()) {
-        showToast(
-            "Only a Super Admin can change administrator roles.",
-            "error"
-        );
-
-        return;
-    }
-
-    const newRole =
-        normalise(currentRole) ===
-        "super_admin"
-            ? "admin"
-            : "super_admin";
-
-    const confirmed = window.confirm(
-        `Change ${email}'s role to ${
-            newRole === "super_admin"
-                ? "Super Admin"
-                : "Admin"
-        }?`
-    );
-
-    if (!confirmed) {
-        return;
-    }
-
-    try {
-        const { data, error } =
-            await supabase.functions.invoke(
-                "admin-management",
-                {
-                    body: {
-                        action: "update",
-                        user_id: adminId,
-                        role: newRole
-                    }
-                }
-            );
-
-        if (error) {
-            throw error;
-        }
-
-        if (data?.error) {
-            throw new Error(data.error);
-        }
-
-        showToast(
-            "Administrator role updated."
-        );
-
-        await loadAdministrators();
-    } catch (error) {
-        console.error(
-            "Role change error:",
-            error
-        );
-
-        showToast(
-            error?.message ||
-                "Unable to change administrator role.",
-            "error"
-        );
-    }
-}
 
 async function deleteAdministrator(
     adminId,
@@ -2338,22 +3189,36 @@ async function deleteAdministrator(
         return;
     }
 
-    const confirmed = window.confirm(
-        `Remove administrator ${email}?\n\nThis action cannot be undone.`
-    );
+    if (!adminId) {
+        showToast(
+            "Administrator ID is missing.",
+            "error"
+        );
+
+        return;
+    }
+
+    const confirmed =
+        window.confirm(
+            `Remove administrator ${email}?\n\nThis action cannot be undone.`
+        );
 
     if (!confirmed) {
         return;
     }
 
     try {
-        const { data, error } =
+        const {
+            data,
+            error
+        } =
             await supabase.functions.invoke(
                 "admin-management",
                 {
                     body: {
                         action: "delete",
-                        user_id: adminId
+                        user_id:
+                            adminId
                     }
                 }
             );
@@ -2363,7 +3228,9 @@ async function deleteAdministrator(
         }
 
         if (data?.error) {
-            throw new Error(data.error);
+            throw new Error(
+                data.error
+            );
         }
 
         showToast(
@@ -2394,11 +3261,15 @@ function initialiseAllocationActions() {
     const table =
         $("#allocationsTable");
 
-    if (!table || table.dataset.eventsAttached) {
+    if (
+        !table ||
+        table.dataset.eventsAttached
+    ) {
         return;
     }
 
-    table.dataset.eventsAttached = "true";
+    table.dataset.eventsAttached =
+        "true";
 
     table.addEventListener(
         "click",
@@ -2409,15 +3280,9 @@ function initialiseAllocationActions() {
                 );
 
             if (reassignButton) {
-                const allocationId =
-                    reassignButton.dataset.allocationId;
-
-                const currentBedId =
-                    reassignButton.dataset.currentBedId;
-
                 await reassignAllocation(
-                    allocationId,
-                    currentBedId
+                    reassignButton.dataset.allocationId,
+                    reassignButton.dataset.currentBedId
                 );
 
                 return;
@@ -2437,15 +3302,20 @@ function initialiseAllocationActions() {
     );
 }
 
+
 function initialiseUnallocatedActions() {
     const tbody =
-        $("#unallocatedTableBody");
+        getUnallocatedTableBody();
 
-    if (!tbody || tbody.dataset.eventsAttached) {
+    if (
+        !tbody ||
+        tbody.dataset.eventsAttached
+    ) {
         return;
     }
 
-    tbody.dataset.eventsAttached = "true";
+    tbody.dataset.eventsAttached =
+        "true";
 
     tbody.addEventListener(
         "click",
@@ -2460,21 +3330,27 @@ function initialiseUnallocatedActions() {
             }
 
             await assignUnallocatedStudent(
-                button.dataset.studentId
+                button.dataset.studentId,
+                button.dataset.studentGender
             );
         }
     );
 }
 
+
 function initialiseAdminManagementActions() {
     const tbody =
         $("#administratorsTableBody");
 
-    if (!tbody || tbody.dataset.eventsAttached) {
+    if (
+        !tbody ||
+        tbody.dataset.eventsAttached
+    ) {
         return;
     }
 
-    tbody.dataset.eventsAttached = "true";
+    tbody.dataset.eventsAttached =
+        "true";
 
     tbody.addEventListener(
         "click",
@@ -2488,8 +3364,10 @@ function initialiseAdminManagementActions() {
                 openAdminModal({
                     id:
                         editButton.dataset.adminId,
+
                     email:
                         editButton.dataset.adminEmail,
+
                     role:
                         editButton.dataset.adminRole
                 });
@@ -2512,15 +3390,20 @@ function initialiseAdminManagementActions() {
     );
 }
 
+
 function initialiseRoomActions() {
     const grid =
         $("#roomsGrid");
 
-    if (!grid || grid.dataset.eventsAttached) {
+    if (
+        !grid ||
+        grid.dataset.eventsAttached
+    ) {
         return;
     }
 
-    grid.dataset.eventsAttached = "true";
+    grid.dataset.eventsAttached =
+        "true";
 
     grid.addEventListener(
         "click",
@@ -2679,6 +3562,16 @@ function initialiseButtons() {
                     showToast(
                         "Dashboard refreshed."
                     );
+                } catch (error) {
+                    console.error(
+                        "Refresh error:",
+                        error
+                    );
+
+                    showToast(
+                        "Unable to refresh dashboard.",
+                        "error"
+                    );
                 } finally {
                     setButtonLoading(
                         refreshButton,
@@ -2753,21 +3646,22 @@ function initialiseButtons() {
         );
     }
 
-    const modal =
+    const roomModal =
         $("#roomModal");
 
     if (
-        modal &&
-        !modal.dataset.eventsAttached
+        roomModal &&
+        !roomModal.dataset.eventsAttached
     ) {
-        modal.dataset.eventsAttached =
+        roomModal.dataset.eventsAttached =
             "true";
 
-        modal.addEventListener(
+        roomModal.addEventListener(
             "click",
             (event) => {
                 if (
-                    event.target === modal
+                    event.target ===
+                    roomModal
                 ) {
                     closeRoomModal();
                 }
@@ -2789,7 +3683,8 @@ function initialiseButtons() {
             "click",
             (event) => {
                 if (
-                    event.target === adminModal
+                    event.target ===
+                    adminModal
                 ) {
                     closeAdminModal();
                 }
@@ -2800,7 +3695,7 @@ function initialiseButtons() {
 
 
 /* =========================================================
-   GLOBAL KEYBOARD HANDLERS
+   KEYBOARD
    ========================================================= */
 
 function initialiseKeyboardHandlers() {
@@ -2817,7 +3712,8 @@ function initialiseKeyboardHandlers() {
         "keydown",
         (event) => {
             if (
-                event.key === "Escape"
+                event.key ===
+                "Escape"
             ) {
                 closeRoomModal();
                 closeAdminModal();
@@ -2828,7 +3724,62 @@ function initialiseKeyboardHandlers() {
 
 
 /* =========================================================
-   INITIALISE
+   FORM EVENTS
+   ========================================================= */
+
+function initialiseFormEvents() {
+    const loginForm =
+        $("#loginForm");
+
+    if (
+        loginForm &&
+        !loginForm.dataset.eventsAttached
+    ) {
+        loginForm.dataset.eventsAttached =
+            "true";
+
+        loginForm.addEventListener(
+            "submit",
+            handleLogin
+        );
+    }
+
+    const logoutButton =
+        $("#logoutButton");
+
+    if (
+        logoutButton &&
+        !logoutButton.dataset.eventsAttached
+    ) {
+        logoutButton.dataset.eventsAttached =
+            "true";
+
+        logoutButton.addEventListener(
+            "click",
+            handleLogout
+        );
+    }
+
+    const forgotPasswordLink =
+        $("#forgotPasswordLink");
+
+    if (
+        forgotPasswordLink &&
+        !forgotPasswordLink.dataset.eventsAttached
+    ) {
+        forgotPasswordLink.dataset.eventsAttached =
+            "true";
+
+        forgotPasswordLink.addEventListener(
+            "click",
+            handlePasswordReset
+        );
+    }
+}
+
+
+/* =========================================================
+   APPLICATION INITIALISATION
    ========================================================= */
 
 async function initialise() {
@@ -2836,16 +3787,36 @@ async function initialise() {
         return;
     }
 
+    if (applicationInitialised) {
+        return;
+    }
+
     isInitialising = true;
 
     try {
+        /*
+         * Attach all static events first.
+         */
+        initialiseFormEvents();
+
         initialiseNavigation();
+
         initialiseAllocationActions();
+
+        /*
+         * This now creates the unallocated tbody
+         * automatically if necessary.
+         */
         initialiseUnallocatedActions();
+
         initialiseAdminManagementActions();
+
         initialiseRoomActions();
+
         initialiseSearchAndFilters();
+
         initialiseButtons();
+
         initialiseKeyboardHandlers();
 
         const session =
@@ -2853,6 +3824,10 @@ async function initialise() {
 
         if (!session) {
             showLogin();
+
+            applicationInitialised =
+                true;
+
             return;
         }
 
@@ -2867,9 +3842,20 @@ async function initialise() {
 
         await initialiseAdminManagement();
 
+        /*
+         * The unallocated table body may have been
+         * dynamically created during page setup.
+         */
+        initialiseUnallocatedActions();
+
         await loadEverything();
 
-        activateSection("dashboardSection");
+        activateSection(
+            "dashboardSection"
+        );
+
+        applicationInitialised =
+            true;
     } catch (error) {
         console.error(
             "Admin initialisation error:",
@@ -2890,11 +3876,25 @@ async function initialise() {
 
 
 /* =========================================================
-   AUTH STATE CHANGES
+   AUTH STATE CHANGE
    ========================================================= */
 
 supabase.auth.onAuthStateChange(
-    async (_event, session) => {
+    async (
+        event,
+        session
+    ) => {
+        /*
+         * Ignore the INITIAL_SESSION event when
+         * initialise() is already processing it.
+         */
+        if (
+            event ===
+                "INITIAL_SESSION"
+        ) {
+            return;
+        }
+
         if (!session) {
             currentUser = null;
             currentProfile = null;
@@ -2904,6 +3904,10 @@ supabase.auth.onAuthStateChange(
             return;
         }
 
+        /*
+         * Do not duplicate the complete
+         * initialisation process.
+         */
         currentUser =
             session.user;
 
@@ -2915,54 +3919,28 @@ supabase.auth.onAuthStateChange(
 
         await initialiseAdminManagement();
 
+        initialiseUnallocatedActions();
+
         await loadEverything();
     }
 );
 
 
 /* =========================================================
-   FORM EVENTS
+   START
    ========================================================= */
 
-const loginForm =
-    $("#loginForm");
-
-if (loginForm) {
-    loginForm.addEventListener(
-        "submit",
-        handleLogin
+if (
+    document.readyState ===
+    "loading"
+) {
+    document.addEventListener(
+        "DOMContentLoaded",
+        initialise,
+        {
+            once: true
+        }
     );
-}
-
-const logoutButton =
-    $("#logoutButton");
-
-if (logoutButton) {
-    logoutButton.addEventListener(
-        "click",
-        handleLogout
-    );
-}
-
-const forgotPasswordLink =
-    $("#forgotPasswordLink");
-
-if (forgotPasswordLink) {
-    forgotPasswordLink.addEventListener(
-        "click",
-        handlePasswordReset
-    );
-}
-
-
-/* =========================================================
-   START APPLICATION
-   ========================================================= */
-
-if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", () => {
-        initialise();
-    }, { once: true });
 } else {
     initialise();
 }
