@@ -72,6 +72,23 @@ ALTER TABLE public.beds
 
 
 -- ============================================================
+-- REMOVE STUDENT AUTH ACCOUNTS
+-- ============================================================
+--
+-- Permanent student Auth accounts use the deterministic
+-- @student-login.uhas.local address. A reset that only clears
+-- students.auth_user_id would leave those Auth users behind,
+-- causing the next login to fail with "email already registered".
+--
+-- This is intentionally part of the destructive allocation-cycle
+-- reset and does not touch administrator accounts.
+-- ============================================================
+
+DELETE FROM auth.users
+WHERE lower(coalesce(email, '')) LIKE '%@student-login.uhas.local';
+
+
+-- ============================================================
 -- RESET STUDENT ACCESS ACTIVATION
 -- ============================================================
 

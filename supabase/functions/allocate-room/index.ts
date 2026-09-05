@@ -22,6 +22,18 @@ function response(
   );
 }
 
+// Admin client with elevated privileges for execution
+const supabaseAdmin = createClient(
+  Deno.env.get('SUPABASE_URL')!,
+  Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
+  {
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false,
+    },
+  }
+);
+
 Deno.serve(async (req) => {
 
   if (req.method === 'OPTIONS') {
@@ -33,7 +45,6 @@ Deno.serve(async (req) => {
     );
   }
 
-
   if (req.method !== 'POST') {
     return response(
       {
@@ -43,7 +54,6 @@ Deno.serve(async (req) => {
       405
     );
   }
-
 
   try {
 
@@ -64,8 +74,7 @@ Deno.serve(async (req) => {
       );
     }
 
-
-    const supabase =
+    const supabaseUser =
       createClient(
         Deno.env.get('SUPABASE_URL')!,
         Deno.env.get('SUPABASE_ANON_KEY')!,
@@ -83,15 +92,13 @@ Deno.serve(async (req) => {
         }
       );
 
-
     const {
       data: {
         user,
       },
       error: userError,
     } =
-      await supabase.auth.getUser();
-
+      await supabaseUser.auth.getUser();
 
     if (
       userError ||
@@ -106,7 +113,6 @@ Deno.serve(async (req) => {
       );
     }
 
-
     // --------------------------------------------------------
     // 2. Verify permanent student account
     // --------------------------------------------------------
@@ -115,7 +121,7 @@ Deno.serve(async (req) => {
       data: student,
       error: studentError,
     } =
-      await supabase
+      await supabaseAdmin
         .from('students')
         .select(`
           id,
@@ -129,7 +135,6 @@ Deno.serve(async (req) => {
           user.id
         )
         .maybeSingle();
-
 
     if (studentError) {
       console.error(
@@ -146,7 +151,6 @@ Deno.serve(async (req) => {
       );
     }
 
-
     if (!student) {
       return response(
         {
@@ -157,7 +161,6 @@ Deno.serve(async (req) => {
       );
     }
 
-
     if (!student.eligible) {
       return response(
         {
@@ -166,10 +169,7 @@ Deno.serve(async (req) => {
         },
         403
       );
-
-
     }
-
 
     // --------------------------------------------------------
     // 3. Read action
@@ -180,7 +180,6 @@ Deno.serve(async (req) => {
       room_id?: string;
       hold_id?: string;
     };
-
 
     try {
       body = await req.json();
@@ -194,14 +193,12 @@ Deno.serve(async (req) => {
       );
     }
 
-
     const action =
       String(
         body.action ?? ''
       )
         .trim()
         .toLowerCase();
-
 
     // --------------------------------------------------------
     // 4. HOLD
@@ -214,7 +211,6 @@ Deno.serve(async (req) => {
           body.room_id ?? ''
         ).trim();
 
-
       if (!roomId) {
         return response(
           {
@@ -225,22 +221,18 @@ Deno.serve(async (req) => {
         );
       }
 
-
       const {
         data,
         error,
       } =
-        await supabase.rpc(
+        await supabaseUser.rpc(
           'create_room_hold',
           {
-            p_room_id:
-              roomId,
+            p_room_id: roomId,
           }
         );
 
-
       if (error) {
-
         console.error(
           'create_room_hold failed:',
           error
@@ -256,13 +248,11 @@ Deno.serve(async (req) => {
         );
       }
 
-
       return response(
         data,
         200
       );
     }
-
 
     // --------------------------------------------------------
     // 5. CONFIRM
@@ -275,7 +265,6 @@ Deno.serve(async (req) => {
           body.hold_id ?? ''
         ).trim();
 
-
       if (!holdId) {
         return response(
           {
@@ -286,22 +275,18 @@ Deno.serve(async (req) => {
         );
       }
 
-
       const {
         data,
         error,
       } =
-        await supabase.rpc(
+        await supabaseUser.rpc(
           'confirm_room_allocation',
           {
-            p_hold_id:
-              holdId,
+            p_hold_id: holdId,
           }
         );
 
-
       if (error) {
-
         console.error(
           'confirm_room_allocation failed:',
           error
@@ -317,13 +302,56 @@ Deno.serve(async (req) => {
         );
       }
 
-
       return response(
         data,
         200
       );
     }
 
+    // --------------------------------------------------------
+    // 6. CANCEL
+    // --------------------------------------------------------
+
+    if (action === 'cancel') {
+      const holdId = String(body.hold_id ?? '').trim();
+
+      if (!holdId) {
+        return response(
+          {
+            error: 'Hold ID is required',
+          },
+          400
+        );
+      }
+
+      const {
+        data,
+        error,
+      } = await supabaseUser.rpc(
+        'cancel_room_hold',
+        {
+          p_hold_id: holdId,
+        }
+      );
+
+      if (error) {
+        console.error(
+          'cancel_room_hold failed:',
+          error
+        );
+
+        return response(
+          {
+            error:
+              error.message ??
+              'Unable to cancel reservation',
+          },
+          400
+        );
+      }
+
+      return response(data, 200);
+    }
 
     return response(
       {
@@ -334,7 +362,6 @@ Deno.serve(async (req) => {
     );
 
   } catch (error) {
-
     console.error(
       'Allocate-room function error:',
       error

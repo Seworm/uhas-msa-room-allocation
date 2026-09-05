@@ -1,0 +1,438 @@
+warning: in the working copy of 'supabase/migrations/20260902233000_admin_reporting_fix.sql', LF will be replaced by CRLF the next time Git touches it
+[1mdiff --git a/supabase/migrations/20260902233000_admin_reporting_fix.sql b/supabase/migrations/20260902233000_admin_reporting_fix.sql[m
+[1mindex e774d41..ab370be 100644[m
+[1m--- a/supabase/migrations/20260902233000_admin_reporting_fix.sql[m
+[1m+++ b/supabase/migrations/20260902233000_admin_reporting_fix.sql[m
+[36m@@ -1,306 +1,141 @@[m
+ BEGIN;[m
+ [m
+[31m-CREATE OR REPLACE FUNCTION public.admin_dashboard_summary()[m
+[31m-RETURNS jsonb[m
+[31m-LANGUAGE plpgsql[m
+[31m-SECURITY DEFINER[m
+[31m-SET search_path = public[m
+[31m-AS $$[m
+[31m-DECLARE[m
+[31m-    v_total_rooms bigint;[m
+[31m-    v_bookable_rooms bigint;[m
+[31m-    v_full_rooms bigint;[m
+[31m-    v_rooms_with_vacancy bigint;[m
+[31m-[m
+[31m-    v_total_beds bigint;[m
+[31m-    v_occupied_beds bigint;[m
+[31m-    v_available_beds bigint;[m
+[31m-    v_maintenance_beds bigint;[m
+[31m-[m
+[31m-    v_total_students bigint;[m
+[31m-    v_eligible_students bigint;[m
+[31m-    v_activated_students bigint;[m
+[31m-    v_allocated_students bigint;[m
+[31m-    v_unallocated_students bigint;[m
+[31m-[m
+[31m-    v_active_holds bigint;[m
+[31m-    v_active_allocations bigint;[m
+[31m-[m
+[31m-    v_male_students bigint;[m
+[31m-    v_female_students bigint;[m
+[31m-[m
+[31m-    v_allocation_open boolean;[m
+[31m-BEGIN[m
+[31m-    IF NOT public.is_admin() THEN[m
+[31m-        RAISE EXCEPTION 'Not authorised';[m
+[31m-    END IF;[m
+[31m-[m
+[31m-    SELECT[m
+[31m-        COUNT(*),[m
+[31m-        COUNT(*) FILTER (WHERE bookable = true),[m
+[31m-        COUNT(*) FILTER ([m
+[31m-            WHERE bookable = true[m
+[31m-            AND NOT EXISTS ([m
+[31m-                SELECT 1[m
+[31m-                FROM public.beds b[m
+[31m-                WHERE b.room_id = r.id[m
+[31m-                  AND b.status = 'AVAILABLE'[m
+[31m-            )[m
+[31m-        ),[m
+[31m-        COUNT(*) FILTER ([m
+[31m-            WHERE bookable = true[m
+[31m-            AND EXISTS ([m
+[31m-                SELECT 1[m
+[31m-                FROM public.beds b[m
+[31m-                WHERE b.room_id = r.id[m
+[31m-                  AND b.status = 'AVAILABLE'[m
+[31m-            )[m
+[31m-        )[m
+[31m-    INTO[m
+[31m-        v_total_rooms,[m
+[31m-        v_bookable_rooms,[m
+[31m-        v_full_rooms,[m
+[31m-        v_rooms_with_vacancy[m
+[31m-    FROM public.rooms r[m
+[31m-    WHERE r.active = true;[m
+[31m-[m
+[31m-    SELECT[m
+[31m-        COUNT(*),[m
+[31m-        COUNT(*) FILTER (WHERE status = 'OCCUPIED'),[m
+[31m-        COUNT(*) FILTER (WHERE status = 'AVAILABLE'),[m
+[31m-        COUNT(*) FILTER (WHERE status = 'MAINTENANCE')[m
+[31m-    INTO[m
+[31m-        v_total_beds,[m
+[31m-        v_occupied_beds,[m
+[31m-        v_available_beds,[m
+[31m-        v_maintenance_beds[m
+[31m-    FROM public.beds;[m
+[31m-[m
+[31m-    SELECT[m
+[31m-        COUNT(*),[m
+[31m-        COUNT(*) FILTER (WHERE eligible = true),[m
+[31m-        COUNT(*) FILTER (WHERE access_code_activated_at IS NOT NULL),[m
+[31m-        COUNT(DISTINCT a.student_id) FILTER (WHERE a.status = 'ACTIVE'),[m
+[31m-        COUNT(*) FILTER ([m
+[31m-            WHERE eligible = true[m
+[31m-            AND NOT EXISTS ([m
+[31m-                SELECT 1[m
+[31m-                FROM public.allocations a2[m
+[31m-                WHERE a2.student_id = s.id[m
+[31m-                  AND a2.status = 'ACTIVE'[m
+[31m-            )[m
+[31m-        )[m
+[31m-    INTO[m
+[31m-        v_total_students,[m
+[31m-        v_eligible_students,[m
+[31m-        v_activated_students,[m
+[31m-        v_allocated_students,[m
+[31m-        v_unallocated_students[m
+[31m-    FROM public.students s[m
+[31m-    LEFT JOIN public.allocations a[m
+[31m-        ON a.student_id = s.id[m
+[31m-       AND a.status = 'ACTIVE';[m
+[31m-[m
+[31m-    SELECT COUNT(*)[m
+[31m-    INTO v_active_holds[m
+[31m-    FROM public.holds[m
+[31m-    WHERE status = 'ACTIVE'[m
+[31m-      AND expires_at > now();[m
+[31m-[m
+[31m-    SELECT COUNT(*)[m
+[31m-    INTO v_active_allocations[m
+[31m-    FROM public.allocations[m
+[31m-    WHERE status = 'ACTIVE';[m
+[31m-[m
+[31m-    SELECT COUNT(*)[m
+[31m-    INTO v_male_students[m
+[31m-    FROM public.students[m
+[31m-    WHERE eligible = true[m
+[31m-      AND UPPER(gender) = 'MALE';[m
+[31m-[m
+[31m-    SELECT COUNT(*)[m
+[31m-    INTO v_female_students[m
+[31m-    FROM public.students[m
+[31m-    WHERE eligible = true[m
+[31m-      AND UPPER(gender) = 'FEMALE';[m
+[31m-[m
+[31m-    SELECT COALESCE([m
+[31m-        ([m
+[31m-            SELECT value::boolean[m
+[31m-            FROM public.settings[m
+[31m-            WHERE key = 'allocation_open'[m
+[31m-            LIMIT 1[m
+[31m-        ),[m
+[31m-        false[m
+[31m-    )[m
+[31m-    INTO v_allocation_open;[m
+[32m+[m[32m-- Fix the room report to use columns that actually exist in the[m
+[32m+[m[32m-- rooms table. Earlier code referenced a non-existent gender_rule[m
+[32m+[m[32m-- column, which prevented `supabase db push` from completing.[m
+ [m
+[31m-    RETURN jsonb_build_object([m
+[31m-        'students', jsonb_build_object([m
+[31m-            'total', v_total_students,[m
+[31m-            'eligible', v_eligible_students,[m
+[31m-            'activated', v_activated_students,[m
+[31m-            'allocated', v_allocated_students,[m
+[31m-            'unallocated', v_unallocated_students[m
+[31m-        ),[m
+[31m-        'rooms', jsonb_build_object([m
+[31m-            'total', v_total_rooms,[m
+[31m-            'bookable', v_bookable_rooms,[m
+[31m-            'full', v_full_rooms,[m
+[31m-            'with_vacancy', v_rooms_with_vacancy[m
+[31m-        ),[m
+[31m-        'beds', jsonb_build_object([m
+[31m-            'total', v_total_beds,[m
+[31m-            'occupied', v_occupied_beds,[m
+[31m-            'available', v_available_beds,[m
+[31m-            'maintenance', v_maintenance_beds[m
+[31m-        ),[m
+[31m-        'holds', jsonb_build_object([m
+[31m-            'active', v_active_holds[m
+[31m-        ),[m
+[31m-        'allocations', jsonb_build_object([m
+[31m-            'active', v_active_allocations[m
+[31m-        ),[m
+[31m-        'gender', jsonb_build_object([m
+[31m-            'male', v_male_students,[m
+[31m-            'female', v_female_students[m
+[31m-        ),[m
+[31m-        'allocation_open', v_allocation_open[m
+[31m-    );[m
+[31m-END;[m
+[31m-$$;[m
+[31m-[m
+[31m-[m
+[31m-DROP FUNCTION IF EXISTS public.admin_rooms(text);[m
+[31m-[m
+[31m-CREATE FUNCTION public.admin_rooms(p_block text DEFAULT NULL)[m
+[32m+[m[32mCREATE OR REPLACE FUNCTION public.admin_rooms([m
+[32m+[m[32m  p_block TEXT DEFAULT NULL[m
+[32m+[m[32m)[m
+ RETURNS TABLE ([m
+[31m-    room_id uuid,[m
+[31m-    room_code text,[m
+[31m-    block text,[m
+[31m-    floor text,[m
+[31m-    room_number text,[m
+[31m-    capacity integer,[m
+[31m-    room_gender text,[m
+[31m-    active boolean,[m
+[31m-    bookable boolean,[m
+[31m-    temporarily_locked boolean,[m
+[31m-    occupied_beds bigint,[m
+[31m-    available_beds bigint,[m
+[31m-    occupancy_percent integer[m
+[32m+[m[32m  room_id UUID,[m
+[32m+[m[32m  room_code TEXT,[m
+[32m+[m[32m  block TEXT,[m
+[32m+[m[32m  floor TEXT,[m
+[32m+[m[32m  room_number TEXT,[m
+[32m+[m[32m  capacity INTEGER,[m
+[32m+[m[32m  room_gender TEXT,[m
+[32m+[m[32m  active BOOLEAN,[m
+[32m+[m[32m  bookable BOOLEAN,[m
+[32m+[m[32m  temporarily_locked BOOLEAN,[m
+[32m+[m[32m  occupied_beds BIGINT,[m
+[32m+[m[32m  available_beds BIGINT,[m
+[32m+[m[32m  occupancy_percent INTEGER[m
+ )[m
+ LANGUAGE plpgsql[m
+ SECURITY DEFINER[m
+ SET search_path = public[m
+ AS $$[m
+ BEGIN[m
+[31m-    IF NOT public.is_admin() THEN[m
+[31m-        RAISE EXCEPTION 'Not authorised';[m
+[31m-    END IF;[m
+[31m-[m
+[31m-    RETURN QUERY[m
+[31m-    SELECT[m
+[31m-        r.id AS room_id,[m
+[31m-        r.room_code,[m
+[31m-        r.block,[m
+[31m-        r.floor,[m
+[31m-        r.room_number,[m
+[31m-        r.capacity,[m
+[31m-[m
+[31m-        CASE[m
+[31m-            WHEN UPPER(COALESCE(r.gender_rule, '')) = 'MALE'[m
+[31m-                THEN 'Male'[m
+[31m-            WHEN UPPER(COALESCE(r.gender, '')) = 'MALE'[m
+[31m-                THEN 'Male'[m
+[31m-            WHEN UPPER(COALESCE(r.gender, '')) = 'FEMALE'[m
+[31m-                THEN 'Female'[m
+[31m-            WHEN COUNT(s.id) FILTER ([m
+[31m-                WHERE UPPER(s.gender) = 'MALE'[m
+[31m-            ) > 0[m
+[31m-            AND COUNT(s.id) FILTER ([m
+[31m-                WHERE UPPER(s.gender) = 'FEMALE'[m
+[31m-            ) > 0[m
+[31m-                THEN 'Mixed'[m
+[31m-            WHEN COUNT(s.id) FILTER ([m
+[31m-                WHERE UPPER(s.gender) = 'MALE'[m
+[31m-            ) > 0[m
+[31m-                THEN 'Male'[m
+[31m-            WHEN COUNT(s.id) FILTER ([m
+[31m-                WHERE UPPER(s.gender) = 'FEMALE'[m
+[31m-            ) > 0[m
+[31m-                THEN 'Female'[m
+[31m-            ELSE 'Neutral'[m
+[31m-        END AS room_gender,[m
+[31m-[m
+[31m-        r.active,[m
+[31m-        r.bookable,[m
+[31m-        r.temporarily_locked,[m
+[31m-[m
+[31m-        COUNT(b.id) FILTER ([m
+[31m-            WHERE b.status = 'OCCUPIED'[m
+[31m-        ) AS occupied_beds,[m
+[31m-[m
+[31m-        COUNT(b.id) FILTER ([m
+[31m-            WHERE b.status = 'AVAILABLE'[m
+[31m-        ) AS available_beds,[m
+[31m-[m
+[31m-        CASE[m
+[31m-            WHEN r.capacity > 0 THEN[m
+[31m-                ROUND([m
+[31m-                    ([m
+[31m-                        COUNT(b.id) FILTER ([m
+[31m-                            WHERE b.status = 'OCCUPIED'[m
+[31m-                        )::numeric[m
+[31m-                        / r.capacity[m
+[31m-                    ) * 100[m
+[31m-                )::integer[m
+[31m-            ELSE 0[m
+[31m-        END AS occupancy_percent[m
+[31m-[m
+[31m-    FROM public.rooms r[m
+[31m-    LEFT JOIN public.beds b[m
+[31m-        ON b.room_id = r.id[m
+[31m-    LEFT JOIN public.allocations a[m
+[31m-        ON a.bed_id = b.id[m
+[31m-       AND a.status = 'ACTIVE'[m
+[31m-    LEFT JOIN public.students s[m
+[31m-        ON s.id = a.student_id[m
+[31m-[m
+[31m-    WHERE r.active = true[m
+[31m-      AND ([m
+[31m-          p_block IS NULL[m
+[31m-          OR p_block = ''[m
+[31m-          OR r.block = p_block[m
+[31m-      )[m
+[31m-[m
+[31m-    GROUP BY[m
+[31m-        r.id,[m
+[31m-        r.room_code,[m
+[31m-        r.block,[m
+[31m-        r.floor,[m
+[31m-        r.room_number,[m
+[31m-        r.capacity,[m
+[31m-        r.gender,[m
+[31m-        r.gender_rule,[m
+[31m-        r.active,[m
+[31m-        r.bookable,[m
+[31m-        r.temporarily_locked[m
+[32m+[m[32m  IF NOT public.is_admin() THEN[m
+[32m+[m[32m    RAISE EXCEPTION 'Not authorised';[m
+[32m+[m[32m  END IF;[m
+[32m+[m
+[32m+[m[32m  RETURN QUERY[m
+[32m+[m[32m  SELECT[m
+[32m+[m[32m    r.id,[m
+[32m+[m[32m    r.room_code,[m
+[32m+[m[32m    r.block,[m
+[32m+[m[32m    r.floor,[m
+[32m+[m[32m    r.room_number,[m
+[32m+[m[32m    r.capacity,[m
+[32m+[m
+[32m+[m[32m    CASE[m
+[32m+[m[32m      WHEN UPPER(COALESCE(r.gender, '')) = 'MALE'[m
+[32m+[m[32m        THEN 'Male'[m
+[32m+[m[32m      WHEN UPPER(COALESCE(r.gender, '')) = 'FEMALE'[m
+[32m+[m[32m        THEN 'Female'[m
+[32m+[m[32m      WHEN COUNT(s.id) FILTER ([m
+[32m+[m[32m        WHERE UPPER(COALESCE(s.gender, '')) = 'MALE'[m
+[32m+[m[32m      ) > 0[m
+[32m+[m[32m       AND COUNT(s.id) FILTER ([m
+[32m+[m[32m        WHERE UPPER(COALESCE(s.gender, '')) = 'FEMALE'[m
+[32m+[m[32m      ) > 0[m
+[32m+[m[32m        THEN 'Mixed'[m
+[32m+[m[32m      WHEN COUNT(s.id) FILTER ([m
+[32m+[m[32m        WHERE UPPER(COALESCE(s.gender, '')) = 'MALE'[m
+[32m+[m[32m      ) > 0[m
+[32m+[m[32m        THEN 'Male'[m
+[32m+[m[32m      WHEN COUNT(s.id) FILTER ([m
+[32m+[m[32m        WHERE UPPER(COALESCE(s.gender, '')) = 'FEMALE'[m
+[32m+[m[32m      ) > 0[m
+[32m+[m[32m        THEN 'Female'[m
+[32m+[m[32m      ELSE 'Neutral'[m
+[32m+[m[32m    END AS room_gender,[m
+[32m+[m
+[32m+[m[32m    r.active,[m
+[32m+[m[32m    r.bookable,[m
+[32m+[m[32m    r.temporarily_locked,[m
+[32m+[m
+[32m+[m[32m    COUNT(b.id) FILTER ([m
+[32m+[m[32m      WHERE b.status = 'OCCUPIED'[m
+[32m+[m[32m    ) AS occupied_beds,[m
+[32m+[m
+[32m+[m[32m    COUNT(b.id) FILTER ([m
+[32m+[m[32m      WHERE b.status = 'AVAILABLE'[m
+[32m+[m[32m    ) AS available_beds,[m
+[32m+[m
+[32m+[m[32m    CASE[m
+[32m+[m[32m      WHEN r.capacity > 0 THEN[m
+[32m+[m[32m        ROUND([m
+[32m+[m[32m          ([m
+[32m+[m[32m            COUNT(b.id) FILTER ([m
+[32m+[m[32m              WHERE b.status = 'OCCUPIED'[m
+[32m+[m[32m            )::NUMERIC / r.capacity[m
+[32m+[m[32m          ) * 100[m
+[32m+[m[32m        )::INTEGER[m
+[32m+[m[32m      ELSE 0[m
+[32m+[m[32m    END AS occupancy_percent[m
+[32m+[m
+[32m+[m[32m  FROM public.rooms r[m
+[32m+[m
+[32m+[m[32m  LEFT JOIN public.beds b[m
+[32m+[m[32m    ON b.room_id = r.id[m
+[32m+[m
+[32m+[m[32m  LEFT JOIN public.allocations a[m
+[32m+[m[32m    ON a.bed_id = b.id[m
+[32m+[m[32m   AND a.status = 'ACTIVE'[m
+[32m+[m
+[32m+[m[32m  LEFT JOIN public.students s[m
+[32m+[m[32m    ON s.id = a.student_id[m
+[32m+[m
+[32m+[m[32m  WHERE r.active = TRUE[m
+[32m+[m[32m    AND ([m
+[32m+[m[32m      p_block IS NULL[m
+[32m+[m[32m      OR p_block = ''[m
+[32m+[m[32m      OR r.block = p_block[m
+[32m+[m[32m    )[m
+ [m
+[31m-    ORDER BY[m
+[31m-        r.block,[m
+[31m-        CASE[m
+[31m-            WHEN r.room_number ~ '^[0-9]+$'[m
+[31m-                THEN r.room_number::integer[m
+[31m-            ELSE 999999[m
+[31m-        END,[m
+[31m-        r.room_number;[m
+[32m+[m[32m  GROUP BY[m
+[32m+[m[32m    r.id,[m
+[32m+[m[32m    r.room_code,[m
+[32m+[m[32m    r.block,[m
+[32m+[m[32m    r.floor,[m
+[32m+[m[32m    r.room_number,[m
+[32m+[m[32m    r.capacity,[m
+[32m+[m[32m    r.gender,[m
+[32m+[m[32m    r.active,[m
+[32m+[m[32m    r.bookable,[m
+[32m+[m[32m    r.temporarily_locked[m
+[32m+[m
+[32m+[m[32m  ORDER BY[m
+[32m+[m[32m    CASE r.block[m
+[32m+[m[32m      WHEN 'Ahoe' THEN 1[m
+[32m+[m[32m      WHEN 'Bankoe' THEN 2[m
+[32m+[m[32m      WHEN 'Dome' THEN 3[m
+[32m+[m[32m      WHEN 'Hliha' THEN 4[m
+[32m+[m[32m      ELSE 5[m
+[32m+[m[32m    END,[m
+[32m+[m[32m    CASE[m
+[32m+[m[32m      WHEN r.room_number ~ '^[0-9]+$'[m
+[32m+[m[32m        THEN r.room_number::INTEGER[m
+[32m+[m[32m      ELSE 999999[m
+[32m+[m[32m    END,[m
+[32m+[m[32m    r.room_number;[m
+ END;[m
+ $$;[m
+ [m
+[31m-GRANT EXECUTE ON FUNCTION public.admin_dashboard_summary()[m
+[31m-TO authenticated;[m
+[31m-[m
+[31m-GRANT EXECUTE ON FUNCTION public.admin_rooms(text)[m
+[32m+[m[32mGRANT EXECUTE ON FUNCTION public.admin_rooms(TEXT)[m
+ TO authenticated;[m
+ [m
+[31m-COMMIT;[m
+\ No newline at end of file[m
+[32m+[m[32mCOMMIT;[m

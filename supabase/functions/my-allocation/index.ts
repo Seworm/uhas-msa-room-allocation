@@ -4,9 +4,20 @@ const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers':
     'authorization, x-client-info, apikey, content-type',
-  'Access-Control-Allow-Methods': 'GET, OPTIONS',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
   'Content-Type': 'application/json',
 };
+
+const supabaseAdmin = createClient(
+  Deno.env.get('SUPABASE_URL')!,
+  Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
+  {
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false,
+    },
+  }
+);
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -65,14 +76,16 @@ Deno.serve(async (req) => {
     const {
       data: student,
       error: studentError,
-    } = await supabase
+    } = await supabaseAdmin
       .from('students')
       .select(`
         id,
         student_id,
         student_name,
         programme,
-        level
+        level,
+        gender,
+        phone_number
       `)
       .eq('auth_user_id', user.id)
       .maybeSingle();
@@ -101,12 +114,12 @@ Deno.serve(async (req) => {
     const {
       data: allocation,
       error: allocationError,
-    } = await supabase
+    } = await supabaseAdmin
       .from('allocations')
       .select(`
         allocation_number,
         status,
-        created_at,
+        allocated_at,
         beds (
           bed_number,
           room_id,
@@ -180,7 +193,7 @@ Deno.serve(async (req) => {
     const {
       data: roommateAllocations,
       error: roommatesError,
-    } = await supabase
+    } = await supabaseAdmin
       .from('allocations')
       .select(`
         student_id,
@@ -243,7 +256,7 @@ Deno.serve(async (req) => {
             allocation.status,
 
           created_at:
-            allocation.created_at,
+            allocation.allocated_at,
 
           beds: {
             bed_number:
@@ -280,7 +293,7 @@ Deno.serve(async (req) => {
 
     return new Response(
       JSON.stringify({
-        error: String(e),
+        error: 'Unable to load your allocation.',
       }),
       {
         status: 500,

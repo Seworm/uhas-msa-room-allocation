@@ -156,77 +156,33 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Find the student linked to the authenticated Supabase user.
     const {
-      data: student,
-      error: studentError,
-    } = await supabase
-      .from("students")
-      .select(
-        "student_id, student_name, phone_number",
-      )
-      .eq("auth_user_id", user.id)
-      .maybeSingle();
-
-    if (studentError) {
-      console.error(
-        "Student lookup error:",
-        studentError,
-      );
-
-      return jsonResponse(
-        { error: "Unable to retrieve your student profile." },
-        500,
-      );
-    }
-
-    if (!student) {
-      return jsonResponse(
-        {
-          error:
-            "No student profile is linked to your account.",
-        },
-        404,
-      );
-    }
-
-    // Update only the authenticated student's phone number.
-    const {
-      data: updatedStudent,
+      data: savedPhone,
       error: updateError,
-    } = await supabase
-      .from("students")
-      .update({
-        phone_number: phone,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("auth_user_id", user.id)
-      .select(
-        "student_id, student_name, phone_number",
-      )
-      .single();
+    } = await supabase.rpc("update_student_phone", {
+      p_phone: phone,
+    });
 
     if (updateError) {
       console.error(
-        "Phone update error:",
+        "update_student_phone RPC error:",
         updateError,
       );
 
       return jsonResponse(
         {
           error:
+            updateError.message ||
             "Unable to save your phone number. Please try again.",
         },
-        500,
+        400,
       );
     }
 
     return jsonResponse({
       success: true,
       message: "Phone number saved successfully.",
-      phone_number: updatedStudent.phone_number,
-      student_id: updatedStudent.student_id,
-      student_name: updatedStudent.student_name,
+      phone_number: savedPhone ?? phone,
     });
   } catch (error) {
     console.error(

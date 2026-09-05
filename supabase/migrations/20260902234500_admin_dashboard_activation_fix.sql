@@ -19,12 +19,12 @@ begin
 
     /*
       STUDENTS
-      activated_at is the actual activation timestamp column.
+      auth_user_id is the activation link used by the multi-device login flow.
     */
     select jsonb_build_object(
         'total', count(*),
         'eligible', count(*) filter (where eligible = true),
-        'activated', count(*) filter (where activated_at is not null),
+        'activated', count(*) filter (where auth_user_id is not null),
         'unallocated_eligible',
             count(*) filter (
                 where eligible = true

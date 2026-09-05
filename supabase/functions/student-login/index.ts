@@ -33,12 +33,6 @@ const supabaseAdmin = createClient(
 
 // ------------------------------------------------------------
 // Deterministic internal email for every student
-//
-// Example:
-// UHAS202212783
-//
-// becomes:
-// uhas202212783@student-login.uhas.local
 // ------------------------------------------------------------
 
 function studentAuthEmail(studentId: string) {
@@ -48,6 +42,25 @@ function studentAuthEmail(studentId: string) {
     .replace(/[^a-z0-9]/g, '');
 
   return `${normalized}@student-login.uhas.local`;
+}
+
+async function createLoginRequestKey(studentId: string, req: Request) {
+  const forwardedFor =
+    req.headers.get('x-forwarded-for') ||
+    req.headers.get('cf-connecting-ip') ||
+    req.headers.get('x-real-ip') ||
+    'unknown';
+
+  const clientIp = forwardedFor.split(',')[0].trim();
+  const material = `${clientIp}|${studentId}`;
+  const digest = await crypto.subtle.digest(
+    'SHA-256',
+    new TextEncoder().encode(material)
+  );
+
+  return Array.from(new Uint8Array(digest))
+    .map(byte => byte.toString(16).padStart(2, '0'))
+    .join('');
 }
 
 // ------------------------------------------------------------
@@ -76,27 +89,16 @@ async function createPermanentStudentAccount(
   });
 
   if (createError || !created?.user) {
-  console.error(
-    'Permanent student Auth account creation failed:',
-    {
+    console.error('CREATE USER FAILED:', {
       message: createError?.message,
       code: createError?.code,
       status: createError?.status,
-    }
-  );
+    });
 
-  return response(
-    {
-      error: 'Unable to create student account',
-      diagnostic: {
-        message: createError?.message ?? 'Unknown Auth error',
-        code: createError?.code ?? null,
-        status: createError?.status ?? null,
-      },
-    },
-    500
-  );
-}
+    throw new Error(
+      `CREATE_USER_FAILED: ${createError?.message ?? 'No user was returned'}`
+    );
+  }
 
   return created.user;
 }
@@ -106,19 +108,11 @@ async function createPermanentStudentAccount(
 // ------------------------------------------------------------
 
 Deno.serve(async (req) => {
-  // ----------------------------------------------------------
-  // CORS
-  // ----------------------------------------------------------
-
   if (req.method === 'OPTIONS') {
     return new Response('ok', {
       headers: corsHeaders,
     });
   }
-
-  // ----------------------------------------------------------
-  // POST only
-  // ----------------------------------------------------------
 
   if (req.method !== 'POST') {
     return response(
@@ -130,13 +124,12 @@ Deno.serve(async (req) => {
   }
 
   try {
-    // --------------------------------------------------------
-    // 1. Read credentials
-    // --------------------------------------------------------
-
     let body: {
       student_id?: string;
       access_code?: string;
+      index_number?: string;
+      p_index_number?: string;
+      p_access_code?: string;
     };
 
     try {
@@ -150,12 +143,20 @@ Deno.serve(async (req) => {
       );
     }
 
-    const studentId = String(body.student_id ?? '')
+    const studentId = String(
+      body.student_id ||
+      body.index_number ||
+      body.p_index_number ||
+      ''
+    )
       .trim()
       .toUpperCase();
 
-    const accessCode = String(body.access_code ?? '')
-      .trim();
+    const accessCode = String(
+      body.access_code ||
+      body.p_access_code ||
+      ''
+    ).trim();
 
     if (!studentId || !accessCode) {
       return response(
@@ -166,20 +167,24 @@ Deno.serve(async (req) => {
       );
     }
 
-    // --------------------------------------------------------
-    // 2. Authenticate against database
-    // --------------------------------------------------------
+    const requestKey = await createLoginRequestKey(studentId, req);
 
     const {
-      data: students,
+      data: authentication,
       error: authError,
     } = await supabaseAdmin.rpc(
       'authenticate_student_access_code',
       {
         p_student_id: studentId,
         p_access_code: accessCode,
+        p_request_key: requestKey,
       }
     );
+
+    const students =
+      authentication?.authenticated
+        ? [authentication.student]
+        : [];
 
     if (
       authError ||
@@ -205,10 +210,6 @@ Deno.serve(async (req) => {
 
     const student = students[0];
 
-    // --------------------------------------------------------
-    // 3. Verify eligibility
-    // --------------------------------------------------------
-
     if (!student.eligible) {
       return response(
         {
@@ -219,19 +220,11 @@ Deno.serve(async (req) => {
       );
     }
 
-    // --------------------------------------------------------
-    // 4. Determine student's Auth account
-    // --------------------------------------------------------
-
     const email = studentAuthEmail(
       student.student_id
     );
 
     let authUserId = student.auth_user_id;
-
-    // --------------------------------------------------------
-    // 5. Check existing Auth account
-    // --------------------------------------------------------
 
     let existingAuthUser = null;
 
@@ -262,12 +255,6 @@ Deno.serve(async (req) => {
       }
     }
 
-    // --------------------------------------------------------
-    // 6. No valid Auth account
-    //
-    // Create a permanent account.
-    // --------------------------------------------------------
-
     if (!existingAuthUser) {
       const oldAuthUserId = authUserId;
 
@@ -280,7 +267,6 @@ Deno.serve(async (req) => {
 
       authUserId = createdUser.id;
 
-      // Link permanent account to student
       const {
         error: linkError,
       } = await supabaseAdmin
@@ -309,7 +295,6 @@ Deno.serve(async (req) => {
         );
       }
 
-      // Delete stale/anonymous account if one existed
       if (
         oldAuthUserId &&
         oldAuthUserId !== authUserId
@@ -332,28 +317,10 @@ Deno.serve(async (req) => {
           );
         }
       }
-    }
-
-    // --------------------------------------------------------
-    // 7. Existing account is anonymous
-    //
-    // This fixes the old device-specific authentication.
-    // --------------------------------------------------------
-
-    else if (existingAuthUser.is_anonymous) {
+    } else if (existingAuthUser.is_anonymous) {
       const oldAnonymousUserId =
         existingAuthUser.id;
 
-      console.log(
-        'Detected old anonymous student account. ' +
-        'Creating permanent account.',
-        {
-          studentId: student.student_id,
-          oldAuthUserId: oldAnonymousUserId,
-        }
-      );
-
-      // Create permanent account
       const createdUser =
         await createPermanentStudentAccount(
           student.student_id,
@@ -363,7 +330,6 @@ Deno.serve(async (req) => {
 
       authUserId = createdUser.id;
 
-      // Relink student
       const {
         error: linkError,
       } = await supabaseAdmin
@@ -392,7 +358,6 @@ Deno.serve(async (req) => {
         );
       }
 
-      // Delete old anonymous account
       const {
         error: deleteAnonymousError,
       } =
@@ -410,15 +375,7 @@ Deno.serve(async (req) => {
           }
         );
       }
-    }
-
-    // --------------------------------------------------------
-    // 8. Existing permanent account
-    //
-    // Synchronise its password with the current access code.
-    // --------------------------------------------------------
-
-    else {
+    } else {
       const {
         error: updateError,
       } =
@@ -460,12 +417,6 @@ Deno.serve(async (req) => {
       }
     }
 
-    // --------------------------------------------------------
-    // 9. Sign in using normal Supabase Auth
-    //
-    // NEVER use the service-role client for sign-in.
-    // --------------------------------------------------------
-
     const supabaseAuth = createClient(
       Deno.env.get('SUPABASE_URL')!,
       Deno.env.get('SUPABASE_ANON_KEY')!,
@@ -491,7 +442,7 @@ Deno.serve(async (req) => {
       !loginData?.session
     ) {
       console.error(
-        'Student Auth sign-in failed:',
+        'STUDENT AUTH SIGN-IN FAILED:',
         {
           message: loginError?.message,
           code: loginError?.code,
@@ -501,55 +452,33 @@ Deno.serve(async (req) => {
 
       return response(
         {
-          error:
-            'Unable to sign in student',
+          error: 'Unable to establish the student login session',
         },
         401
       );
     }
 
-    // --------------------------------------------------------
-    // 10. Return the real Supabase session
-    // --------------------------------------------------------
-
     return response({
       success: true,
-
+      access_token: loginData.session.access_token,
+      refresh_token: loginData.session.refresh_token,
+      expires_in: loginData.session.expires_in,
+      expires_at: loginData.session.expires_at,
+      token_type: loginData.session.token_type,
       session: {
-        access_token:
-          loginData.session.access_token,
-
-        refresh_token:
-          loginData.session.refresh_token,
-
-        expires_in:
-          loginData.session.expires_in,
-
-        expires_at:
-          loginData.session.expires_at,
-
-        token_type:
-          loginData.session.token_type,
+        access_token: loginData.session.access_token,
+        refresh_token: loginData.session.refresh_token,
+        expires_in: loginData.session.expires_in,
+        expires_at: loginData.session.expires_at,
+        token_type: loginData.session.token_type,
       },
-
       student: {
-        student_id:
-          student.student_id,
-
-        student_name:
-          student.student_name,
-
-        programme:
-          student.programme,
-
-        level:
-          student.level,
-
-        gender:
-          student.gender,
-
-        eligible:
-          student.eligible,
+        student_id: student.student_id,
+        student_name: student.student_name,
+        programme: student.programme,
+        level: student.level,
+        gender: student.gender,
+        eligible: student.eligible,
       },
     });
   } catch (error) {

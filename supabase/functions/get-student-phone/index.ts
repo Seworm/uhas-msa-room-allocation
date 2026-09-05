@@ -94,45 +94,26 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Find the student belonging to the authenticated user.
     const {
-      data: student,
-      error: studentError,
-    } = await supabase
-      .from("students")
-      .select(
-        "student_id, student_name, phone_number",
-      )
-      .eq("auth_user_id", user.id)
-      .maybeSingle();
+      data: phone,
+      error: phoneError,
+    } = await supabase.rpc("get_student_phone");
 
-    if (studentError) {
+    if (phoneError) {
       console.error(
-        "Student lookup error:",
-        studentError,
+        "get_student_phone RPC error:",
+        phoneError,
       );
 
       return jsonResponse(
-        { error: "Unable to retrieve your student profile." },
+        { error: "Unable to retrieve your phone number." },
         500,
-      );
-    }
-
-    if (!student) {
-      return jsonResponse(
-        {
-          error:
-            "No student profile is linked to your account.",
-        },
-        404,
       );
     }
 
     return jsonResponse({
       success: true,
-      phone_number: student.phone_number ?? "",
-      student_id: student.student_id,
-      student_name: student.student_name,
+      phone_number: phone ?? "",
     });
   } catch (error) {
     console.error(

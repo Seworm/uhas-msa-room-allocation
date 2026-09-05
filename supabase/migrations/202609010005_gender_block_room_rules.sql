@@ -15,6 +15,9 @@ BEGIN
   END IF;
 END
 $$;
+ALTER TABLE public.rooms
+  ADD COLUMN IF NOT EXISTS bookable BOOLEAN NOT NULL DEFAULT TRUE;
+
 UPDATE public.rooms
 SET bookable = NOT (
   block = 'Hliha'
