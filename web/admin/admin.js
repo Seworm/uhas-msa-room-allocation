@@ -1061,7 +1061,10 @@ async function loadUnallocated() {
         await rpc(
             "admin_unallocated_students",
             {
-                p_search: null
+                p_search:
+                    $("#unallocatedSearch")
+                        .value
+                        .trim() || null
             }
         );
 
@@ -1074,49 +1077,13 @@ function renderUnallocated() {
     const tbody =
         $("#unallocatedTable");
 
-    const searchInput =
-        $("#unallocatedSearch");
-
-    const search =
-        searchInput
-            ?.value
-            ?.trim()
-            ?.toLowerCase() || "";
-
-
-    const filtered =
-        (currentUnallocated || []).filter(row => {
-
-            if (!search) {
-                return true;
-            }
-
-            const searchableText = [
-                row.student_id,
-                row.student_name,
-                row.email,
-                row.level,
-                row.programme,
-                row.gender
-            ]
-                .filter(value =>
-                    value !== null &&
-                    value !== undefined
-                )
-                .join(" ")
-                .toLowerCase();
-
-            return searchableText.includes(search);
-        });
-
-
-    if (!filtered.length) {
+    if (!currentUnallocated?.length) {
 
         tbody.innerHTML = `
             <tr>
                 <td colspan="6">
                     <div class="empty-state">
-                        No students match your search.
+                        No unallocated eligible students found.
                     </div>
                 </td>
             </tr>
@@ -1125,9 +1092,8 @@ function renderUnallocated() {
         return;
     }
 
-
     tbody.innerHTML =
-        filtered.map(row => `
+        currentUnallocated.map(row => `
 
             <tr>
 
@@ -1173,6 +1139,7 @@ function renderUnallocated() {
 
         `).join("");
 }
+
 
 /* ============================================================
    Audit logs
@@ -1726,23 +1693,6 @@ $("#allocationBlockFilter")
         "change",
         loadAllocations
     );
-
-/* ============================================================
-   LIVE STUDENT SEARCH
-   ============================================================ */
-
-const studentSearch =
-    $("#studentSearch");
-
-if (studentSearch) {
-
-    studentSearch.addEventListener(
-        "input",
-        () => {
-            renderAllocations();
-        }
-    );
-}
 /* ============================================================
    Allocation actions
    ============================================================ */
@@ -2345,6 +2295,20 @@ function initialiseAdminManagement() {
 /* ============================================================
    SEARCH
    ============================================================ */
+
+const studentSearch = $("#studentSearch");
+
+if (studentSearch) {
+    let searchTimer;
+
+    studentSearch.addEventListener("input", () => {
+        clearTimeout(searchTimer);
+
+        searchTimer = setTimeout(() => {
+            loadAllocations();
+        }, 300);
+    });
+}
 
 
 const unallocatedSearch = $("#unallocatedSearch");
