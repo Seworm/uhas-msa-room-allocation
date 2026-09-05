@@ -2955,3 +2955,275 @@ footer {
   }
 
 }
+/* =========================================================
+   FINAL MOBILE HARDENING
+   UHAS STUDENT PORTAL
+   ========================================================= */
+
+html,
+body {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+img,
+svg,
+video,
+canvas {
+  max-width: 100%;
+  height: auto;
+}
+
+button,
+input,
+select,
+textarea {
+  max-width: 100%;
+}
+
+/* Prevent long student names, programme names and IDs
+   from breaking the mobile layout */
+.allocation-details-panel,
+.allocation-details-panel *,
+.student-portal,
+.student-portal *,
+.roommates-panel,
+.roommates-panel *,
+.my-room-panel,
+.my-room-panel * {
+  min-width: 0;
+}
+
+.allocation-number,
+.allocation-student-grid strong,
+.allocation-record strong,
+.my-room-code,
+.roommate-programme,
+.roommate-level,
+.roommates-room-summary strong {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+/* =========================================================
+   MOBILE ALLOCATION DETAILS
+   ========================================================= */
+
+@media (max-width: 700px) {
+
+  .allocation-details-panel {
+    width: 100%;
+    padding: 16px;
+  }
+
+  .allocation-details-heading h3 {
+    font-size: 24px;
+  }
+
+  .allocation-details-heading p {
+    font-size: 12px;
+  }
+
+  .allocation-status-badge {
+    font-size: 9px;
+  }
+
+  .allocation-hero {
+    margin-top: 18px;
+    border-radius: 17px;
+  }
+
+  .allocation-hero-main,
+  .allocation-hero-room {
+    padding: 20px;
+  }
+
+  .allocation-number {
+    font-size: clamp(21px, 8vw, 30px);
+  }
+
+  .allocation-room-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .allocation-room-item {
+    padding: 15px;
+  }
+
+  .allocation-room-item strong {
+    font-size: 16px;
+  }
+
+  .allocation-student-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .allocation-student-grid > div {
+    padding: 15px;
+    border-right: 0 !important;
+  }
+
+  .allocation-student-grid > div:last-child {
+    border-bottom: 0;
+  }
+
+  .allocation-record {
+    grid-template-columns: 1fr;
+  }
+
+  .allocation-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .allocation-print-button {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .allocation-print-note {
+    line-height: 1.5;
+  }
+}
+
+/* =========================================================
+   SMALL PHONES — iPHONE SE / SMALL ANDROID
+   ========================================================= */
+
+@media (max-width: 420px) {
+
+  main {
+    width: calc(100% - 16px);
+  }
+
+  section {
+    padding: 16px 13px;
+    border-radius: 15px;
+  }
+
+  .allocation-details-panel {
+    padding: 13px;
+  }
+
+  .allocation-hero-main,
+  .allocation-hero-room {
+    padding: 18px;
+  }
+
+  .allocation-room-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .allocation-room-item {
+    padding: 13px 11px;
+  }
+
+  .allocation-room-item span,
+  .allocation-student-grid span,
+  .allocation-record span {
+    font-size: 8px;
+  }
+
+  .allocation-room-item strong {
+    font-size: 15px;
+  }
+
+  .allocation-student-grid strong {
+    font-size: 12px;
+  }
+
+  .allocation-record strong {
+    font-size: 11px;
+  }
+
+  .allocation-section-title {
+    margin-top: 24px;
+  }
+
+  .allocation-section-icon {
+    width: 31px;
+    height: 31px;
+    flex-basis: 31px;
+  }
+}
+
+/* =========================================================
+   VERY SMALL PHONES
+   ========================================================= */
+
+@media (max-width: 360px) {
+
+  main {
+    width: calc(100% - 12px);
+  }
+
+  section {
+    padding: 14px 11px;
+  }
+
+  .allocation-details-panel {
+    padding: 11px;
+  }
+
+  .allocation-hero-main,
+  .allocation-hero-room {
+    padding: 16px;
+  }
+
+  .allocation-number {
+    font-size: 20px;
+  }
+
+  .allocation-room-item {
+    padding: 12px 9px;
+  }
+
+  .allocation-room-item strong {
+    font-size: 14px;
+  }
+}
+
+/* =========================================================
+   TOUCH DEVICES
+   ========================================================= */
+
+@media (hover: none) and (pointer: coarse) {
+
+  button {
+    min-height: 50px;
+  }
+
+  .room-card:hover,
+  .choice-button:hover,
+  .modern-roommate-card:hover {
+    transform: none;
+  }
+
+  .room-card:active,
+  .choice-button:active {
+    transform: scale(.99);
+  }
+}
+
+/* =========================================================
+   SAFARI / iOS INPUT FIX
+   ========================================================= */
+
+input,
+button {
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+input {
+  font-size: 16px;
+}
+
+/* Prevent iOS Safari from zooming into inputs */
+@media (max-width: 600px) {
+  input {
+    font-size: 16px;
+  }
+}
