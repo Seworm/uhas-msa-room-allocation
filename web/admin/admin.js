@@ -2255,3 +2255,35 @@ function initialiseAdminManagement() {
     loadAdministrators();
 }
 ```
+/* ============================================================
+   SEARCH
+   ============================================================ */
+
+const studentSearch = $("#studentSearch");
+
+if (studentSearch) {
+    let searchTimer;
+
+    studentSearch.addEventListener("input", () => {
+        clearTimeout(searchTimer);
+
+        searchTimer = setTimeout(() => {
+            loadAllocations();
+        }, 300);
+    });
+}
+
+
+const unallocatedSearch = $("#unallocatedSearch");
+
+if (unallocatedSearch) {
+    let searchTimer;
+
+    unallocatedSearch.addEventListener("input", () => {
+        clearTimeout(searchTimer);
+
+        searchTimer = setTimeout(() => {
+            loadUnallocated();
+        }, 300);
+    });
+}
