@@ -1280,3 +1280,359 @@ $("#printReport")
 
 
 initialise();
+initialiseAdminManagement();
+// ============================================================
+// SUPER ADMIN MANAGEMENT
+// ============================================================
+
+let administrators = [];
+
+async function adminManagementRequest(action, payload = {}) {
+    const {
+        data: { session }
+    } = await supabase.auth.getSession();
+
+    if (!session) {
+        throw new Error("Your administrator session has expired.");
+    }
+
+    const { data, error } = await supabase.functions.invoke(
+        "admin-management",
+        {
+            body: {
+                action,
+                ...payload
+            }
+        }
+    );
+
+    if (error) {
+        throw error;
+    }
+
+    if (data?.error) {
+        throw new Error(data.error);
+    }
+
+    return data;
+}
+
+async function loadAdministrators() {
+    const tableBody = $("#administratorsTableBody");
+
+    if (!tableBody) return;
+
+    tableBody.innerHTML = `
+        <tr>
+            <td colspan="4">Loading administrators…</td>
+        </tr>
+    `;
+
+    try {
+        const data = await adminManagementRequest("list");
+
+        administrators = data.administrators || [];
+
+        renderAdministrators();
+    } catch (error) {
+        console.error("Administrator loading error:", error);
+
+        tableBody.innerHTML = `
+            <tr>
+                <td colspan="4">
+                    Unable to load administrators.
+                </td>
+            </tr>
+        `;
+    }
+}
+
+function renderAdministrators() {
+    const tableBody = $("#administratorsTableBody");
+
+    if (!tableBody) return;
+
+    if (!administrators.length) {
+        tableBody.innerHTML = `
+            <tr>
+                <td colspan="4">
+                    No administrator accounts found.
+                </td>
+            </tr>
+        `;
+        return;
+    }
+
+    tableBody.innerHTML = administrators.map((admin) => {
+        const created = admin.created_at
+            ? new Date(admin.created_at).toLocaleDateString()
+            : "—";
+
+        return `
+            <tr>
+                <td>${escapeHtml(admin.email || "—")}</td>
+
+                <td>
+                    <span class="role-badge ${admin.role}">
+                        ${admin.role === "super_admin"
+                            ? "Super Admin"
+                            : "Admin"}
+                    </span>
+                </td>
+
+                <td>${created}</td>
+
+                <td>
+                    <div class="admin-actions">
+
+                        <button
+                            type="button"
+                            class="secondary-button"
+                            data-admin-role="${admin.id}"
+                        >
+                            Change Role
+                        </button>
+
+                        <button
+                            type="button"
+                            class="danger-button"
+                            data-admin-delete="${admin.id}"
+                        >
+                            Remove
+                        </button>
+
+                    </div>
+                </td>
+            </tr>
+        `;
+    }).join("");
+}
+
+function escapeHtml(value) {
+    return String(value)
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
+}
+
+function openAdminManagementModal() {
+    const modal = $("#adminManagementModal");
+    const form = $("#adminForm");
+
+    if (!modal || !form) return;
+
+    form.reset();
+
+    $("#adminModalTitle").textContent = "Add Administrator";
+    $("#saveAdminButton").textContent = "Create Administrator";
+    $("#adminPassword").required = true;
+    $("#adminFormError").textContent = "";
+
+    modal.style.display = "flex";
+}
+
+function closeAdminManagementModal() {
+    const modal = $("#adminManagementModal");
+
+    if (modal) {
+        modal.style.display = "none";
+    }
+}
+
+async function createAdministrator(event) {
+    event.preventDefault();
+
+    const email = $("#adminEmail").value.trim();
+    const password = $("#adminPassword").value;
+    const role = $("#adminRoleSelect").value;
+    const errorBox = $("#adminFormError");
+    const saveButton = $("#saveAdminButton");
+
+    errorBox.textContent = "";
+
+    if (!email) {
+        errorBox.textContent = "Enter an email address.";
+        return;
+    }
+
+    if (password.length < 8) {
+        errorBox.textContent =
+            "Password must contain at least 8 characters.";
+        return;
+    }
+
+    saveButton.disabled = true;
+    saveButton.textContent = "Creating…";
+
+    try {
+        await adminManagementRequest("create", {
+            email,
+            password,
+            role
+        });
+
+        closeAdminManagementModal();
+
+        await loadAdministrators();
+
+        alert("Administrator created successfully.");
+    } catch (error) {
+        console.error("Administrator creation error:", error);
+
+        errorBox.textContent =
+            error.message ||
+            "Unable to create administrator.";
+    } finally {
+        saveButton.disabled = false;
+        saveButton.textContent = "Create Administrator";
+    }
+}
+
+async function changeAdministratorRole(id) {
+    const admin = administrators.find(
+        (item) => item.id === id
+    );
+
+    if (!admin) return;
+
+    const newRole =
+        admin.role === "admin"
+            ? "super_admin"
+            : "admin";
+
+    const confirmed = confirm(
+        `Change ${admin.email}'s role to ${
+            newRole === "super_admin"
+                ? "Super Admin"
+                : "Admin"
+        }?`
+    );
+
+    if (!confirmed) return;
+
+    try {
+        await adminManagementRequest("change_role", {
+            user_id: id,
+            role: newRole
+        });
+
+        await loadAdministrators();
+
+        alert("Administrator role updated.");
+    } catch (error) {
+        console.error("Role change error:", error);
+
+        alert(
+            error.message ||
+            "Unable to change administrator role."
+        );
+    }
+}
+
+async function removeAdministrator(id) {
+    const admin = administrators.find(
+        (item) => item.id === id
+    );
+
+    if (!admin) return;
+
+    const confirmed = confirm(
+        `Remove administrator access from ${admin.email}?\n\n` +
+        "This will delete the administrator's authentication account."
+    );
+
+    if (!confirmed) return;
+
+    try {
+        await adminManagementRequest("delete", {
+            user_id: id
+        });
+
+        await loadAdministrators();
+
+        alert("Administrator removed successfully.");
+    } catch (error) {
+        console.error("Administrator removal error:", error);
+
+        alert(
+            error.message ||
+            "Unable to remove administrator."
+        );
+    }
+}
+
+function initialiseAdminManagement() {
+    const managementSection =
+        $("#adminManagementSection");
+
+    if (!managementSection) return;
+
+    const role =
+        $("#adminRole")?.textContent
+            ?.trim()
+            ?.toLowerCase();
+
+    if (role !== "super admin") {
+        managementSection.style.display = "none";
+        return;
+    }
+
+    managementSection.style.display = "block";
+
+    $("#addAdminButton")
+        ?.addEventListener(
+            "click",
+            openAdminManagementModal
+        );
+
+    $("#closeAdminModalButton")
+        ?.addEventListener(
+            "click",
+            closeAdminManagementModal
+        );
+
+    $("#cancelAdminButton")
+        ?.addEventListener(
+            "click",
+            closeAdminManagementModal
+        );
+
+    $("#adminForm")
+        ?.addEventListener(
+            "submit",
+            createAdministrator
+        );
+
+    $("#administratorsTableBody")
+        ?.addEventListener(
+            "click",
+            (event) => {
+                const roleButton =
+                    event.target.closest(
+                        "[data-admin-role]"
+                    );
+
+                const deleteButton =
+                    event.target.closest(
+                        "[data-admin-delete]"
+                    );
+
+                if (roleButton) {
+                    changeAdministratorRole(
+                        roleButton.dataset.adminRole
+                    );
+                    return;
+                }
+
+                if (deleteButton) {
+                    removeAdministrator(
+                        deleteButton.dataset.adminDelete
+                    );
+                }
+            }
+        );
+
+    loadAdministrators();
+}

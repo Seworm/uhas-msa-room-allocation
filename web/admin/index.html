@@ -350,7 +350,91 @@
             </div>
 
         </section>
+<section id="adminManagementSection" class="panel" style="display:none;">
+    <div class="panel-header">
+        <div>
+            <h2>Administrator Management</h2>
+            <p>Manage administrator accounts and access.</p>
+        </div>
+        <button id="addAdminButton" class="primary-button" type="button">
+            + Add Administrator
+        </button>
+    </div>
 
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>Email</th>
+                    <th>Role</th>
+                    <th>Created</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody id="administratorsTableBody">
+                <tr>
+                    <td colspan="4">Loading administrators…</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</section>
+
+<div id="adminManagementModal" class="modal" style="display:none;">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2 id="adminModalTitle">Add Administrator</h2>
+            <button id="closeAdminModalButton" type="button" class="modal-close">
+                &times;
+            </button>
+        </div>
+
+        <form id="adminForm">
+            <label for="adminEmail">Email address</label>
+            <input
+                id="adminEmail"
+                type="email"
+                autocomplete="off"
+                required
+            >
+
+            <label for="adminPassword">Temporary password</label>
+            <input
+                id="adminPassword"
+                type="password"
+                minlength="8"
+                autocomplete="new-password"
+                required
+            >
+
+            <label for="adminRoleSelect">Role</label>
+            <select id="adminRoleSelect" required>
+                <option value="admin">Admin</option>
+                <option value="super_admin">Super Admin</option>
+            </select>
+
+            <p id="adminFormError" class="error"></p>
+
+            <div class="modal-actions">
+                <button
+                    id="cancelAdminButton"
+                    type="button"
+                    class="secondary-button"
+                >
+                    Cancel
+                </button>
+
+                <button
+                    id="saveAdminButton"
+                    type="submit"
+                    class="primary-button"
+                >
+                    Create Administrator
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
     </main>
 
 </div>
