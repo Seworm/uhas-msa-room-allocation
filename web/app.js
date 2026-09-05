@@ -2332,49 +2332,143 @@ supabase.auth.onAuthStateChange(async (event, session) => {
     }
   }
 });
-
 (async () => {
   try {
     applyBranding();
     createApplicationHeader();
     updateProgress(1);
 
-    const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+    if (genderSection) genderSection.hidden = true;
+    if (blockSection) blockSection.hidden = true;
+    if (roomsSection) roomsSection.hidden = true;
+    if (allocationSection) allocationSection.hidden = true;
+
+    const { data: sessionData, error: sessionError } =
+      await supabase.auth.getSession();
+
     if (sessionError) {
+      console.error('Unable to get Supabase session:', sessionError);
+
       if (loginSection) loginSection.hidden = false;
       return;
     }
 
     const session = sessionData?.session;
 
-    if (wasStudentLoggedOut()) {
-      if (session) await supabase.auth.signOut();
-      if (loginSection) loginSection.hidden = false;
-      return;
-    }
-
+    // No authenticated session
     if (!session || session.user?.is_anonymous) {
-      if (session?.user?.is_anonymous) await supabase.auth.signOut();
+      if (session?.user?.is_anonymous) {
+        await supabase.auth.signOut();
+      }
+
       if (loginSection) loginSection.hidden = false;
       return;
     }
 
-    const existingAllocation = await loadExistingAllocation();
-    if (existingAllocation) return;
+    // --------------------------------------------------
+    // RESTORE STUDENT
+    // --------------------------------------------------
 
-    try {
-      const { data, error } = await invokeStudentFunction('my-allocation');
-      if (!error && data?.student) {
-        currentStudent = data.student;
-        currentPortalData = data;
-      }
-    } catch (error) {
-      console.warn('Unable to restore student profile:', error);
+    const { data, error } =
+      await invokeStudentFunction('my-allocation');
+
+    if (error) {
+      console.error(
+        'my-allocation failed while restoring session:',
+        error
+      );
+
+      /*
+       * DO NOT sign the student out here.
+       *
+       * A 403 may be an Edge Function configuration
+       * problem rather than an expired login.
+       */
+
+      if (loginSection) loginSection.hidden = false;
+
+      return;
     }
 
-    if (loginSection) loginSection.hidden = true;
-    await showGenderSelection();
+    if (!data?.student) {
+      console.warn('No student record returned.');
+
+      if (loginSection) loginSection.hidden = false;
+
+      return;
+    }
+
+    // Successfully restored student
+    currentStudent = data.student;
+    currentPortalData = data;
+
+    if (!Array.isArray(currentPortalData.roommates)) {
+      currentPortalData.roommates = [];
+    }
+
+    // --------------------------------------------------
+    // EXISTING ALLOCATION
+    // --------------------------------------------------
+
+    if (data.allocation) {
+
+      currentAllocation = data.allocation;
+
+      if (loginSection) loginSection.hidden = true;
+      if (genderSection) genderSection.hidden = true;
+      if (blockSection) blockSection.hidden = true;
+      if (roomsSection) roomsSection.hidden = true;
+
+      portalTab = 'room';
+
+      renderStudentPortal();
+
+      return;
+    }
+
+    // --------------------------------------------------
+    // NO ALLOCATION
+    // --------------------------------------------------
+
+    currentAllocation = null;
+
+    if (loginSection) {
+      loginSection.hidden = true;
+    }
+
+    const hasPhone =
+      Boolean(
+        currentStudent?.phone_number &&
+        String(currentStudent.phone_number).trim()
+      );
+
+    const hasGender =
+      Boolean(
+        currentStudent?.gender &&
+        String(currentStudent.gender).trim()
+      );
+
+    // Profile incomplete
+    if (!hasPhone || !hasGender) {
+      await showGenderSelection();
+      return;
+    }
+
+    // Profile complete → choose block
+    showBlockSelection();
+
   } catch (error) {
+
+    console.error(
+      'Application initialization failed:',
+      error
+    );
+
     if (loginSection) loginSection.hidden = false;
+
+    if (genderSection) genderSection.hidden = true;
+    if (blockSection) blockSection.hidden = true;
+    if (roomsSection) roomsSection.hidden = true;
+    if (allocationSection) allocationSection.hidden = true;
   }
 })();
