@@ -132,6 +132,17 @@ async function getAdminRole() {
     return data.role;
 }
 
+function isSuperAdmin() {
+
+    return (
+        $("#adminRole")
+            ?.textContent
+            ?.trim()
+            ?.toLowerCase() ===
+        "super admin"
+    );
+
+}
 
 /* ============================================================
    RPC helper
@@ -1163,28 +1174,79 @@ async function assignUnallocatedStudent(studentId) {
    ============================================================ */
 
 async function loadUnallocated() {
-    const searchInput = document.querySelector('#unallocatedSearch');
 
-    const search = searchInput
-        ? searchInput.value.trim()
-        : '';
+    const searchInput =
+        document.querySelector("#unallocatedSearch");
+
+    const search =
+        searchInput
+            ? searchInput.value.trim()
+            : "";
 
     try {
-        currentUnallocated = await rpc(
-            'admin_unallocated_students',
-            {
-                p_search: search || null
-            }
+
+        console.log(
+            "Loading unallocated students..."
         );
 
-        renderUnallocated(currentUnallocated);
+        currentUnallocated =
+            await rpc(
+                "admin_unallocated_students",
+                {
+                    p_search:
+                        search || null
+                }
+            );
+
+        console.log(
+            "Unallocated students returned:",
+            currentUnallocated
+        );
+
+        renderUnallocated(
+            currentUnallocated
+        );
 
     } catch (error) {
-        console.error('loadUnallocated:', error);
+
+        console.error(
+            "admin_unallocated_students FAILED:",
+            error
+        );
 
         currentUnallocated = [];
 
-        renderUnallocated([]);
+        const tbody =
+            document.querySelector(
+                "#unallocatedTableBody"
+            );
+
+        if (tbody) {
+
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="7">
+                        <div class="empty-state">
+                            Unable to load unallocated students.
+                            <br>
+                            <small>
+                                ${escapeHtml(
+                                    error.message ||
+                                    "Database error"
+                                )}
+                            </small>
+                        </div>
+                    </td>
+                </tr>
+            `;
+
+        }
+
+        showToast(
+            error.message ||
+            "Unable to load unallocated students.",
+            "error"
+        );
     }
 }
 
