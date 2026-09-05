@@ -1065,23 +1065,25 @@ async function initialise() {
     try {
 
         const role =
-            await getAdminRole();
+    await getAdminRole();
 
-        $("#adminRole")
-            .textContent =
-            role === "super_admin"
-                ? "SUPER ADMIN"
-                : "ADMIN";
+$("#adminRole")
+    .textContent =
+    role === "super_admin"
+        ? "SUPER ADMIN"
+        : "ADMIN";
 
-        loginView
-            .classList
-            .add("hidden");
+loginView
+    .classList
+    .add("hidden");
 
-        appView
-            .classList
-            .remove("hidden");
+appView
+    .classList
+    .remove("hidden");
 
-        await loadEverything();
+initialiseAdminManagement();
+
+await loadEverything();
 
     } catch (error) {
 
@@ -1280,7 +1282,6 @@ $("#printReport")
 
 
 initialise();
-initialiseAdminManagement();
 // ============================================================
 // SUPER ADMIN MANAGEMENT
 // ============================================================
