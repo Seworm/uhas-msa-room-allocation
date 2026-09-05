@@ -2,10 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta
-        name="viewport"
-        content="width=device-width, initial-scale=1.0"
-    >
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
     <title>Asogli Hall Administration</title>
 
@@ -16,159 +13,520 @@
 
 <body>
 
+<!-- =========================================================
+     ADMIN LOGIN
+     ========================================================= -->
+
 <div id="loginView" class="screen">
 
-    <div class="login-card">
+    <div class="login-shell">
 
-        <div class="brand-mark">
-            AH
+        <div class="login-brand">
+            <div class="brand-symbol">AH</div>
+
+            <div>
+                <strong>UHAS ASOGLI HALL</strong>
+                <span>Administration</span>
+            </div>
         </div>
 
-        <p class="eyebrow">ADMINISTRATION PORTAL</p>
+        <div class="login-card">
 
-        <h1>Asogli Hall</h1>
+            <div class="login-heading">
+                <p class="eyebrow">SECURE ADMINISTRATION</p>
 
-        <p class="login-subtitle">
-            Secure room allocation administration
+                <h1>Welcome back</h1>
+
+                <p>
+                    Sign in to manage room allocation and hall operations.
+                </p>
+            </div>
+
+            <form id="loginForm">
+
+                <div class="form-group">
+                    <label for="email">Email address</label>
+
+                    <input
+                        id="email"
+                        type="email"
+                        autocomplete="username"
+                        placeholder="Administrator email"
+                        required
+                    >
+                </div>
+
+                <div class="form-group">
+                    <label for="password">Password</label>
+
+                    <input
+                        id="password"
+                        type="password"
+                        autocomplete="current-password"
+                        placeholder="Enter your password"
+                        required
+                    >
+                </div>
+
+                <button
+                    type="submit"
+                    id="loginButton"
+                    class="login-button"
+                >
+                    Sign in
+                </button>
+
+                <a
+                    href="#"
+                    id="forgotPasswordLink"
+                    class="forgot-password"
+                >
+                    Forgot your password?
+                </a>
+
+                <p id="loginError" class="error"></p>
+
+            </form>
+
+        </div>
+
+        <p class="login-footer">
+            UHAS Asogli Hall • Room Allocation Administration
         </p>
-
-        <form id="loginForm">
-
-            <label for="email">Email address</label>
-            <input
-                id="email"
-                type="email"
-                autocomplete="username"
-                placeholder="Administrator email"
-                required
-            >
-
-            <label for="password">Password</label>
-
-            <input
-                id="password"
-                type="password"
-                autocomplete="current-password"
-                placeholder="Password"
-                required
-            >
-
-            <button type="submit" id="loginButton">
-    Sign in
-</button>
-
-<p style="margin:12px 0;text-align:center;">
-    <a href="#" id="forgotPasswordLink">Forgot password?</a>
-</p>
-
-<p id="loginError" class="error"></p>
-
-        </form>
 
     </div>
 
 </div>
 
 
+<!-- =========================================================
+     ADMIN APPLICATION
+     ========================================================= -->
+
 <div id="appView" class="app hidden">
 
-    <header class="topbar">
+    <!-- MOBILE HEADER -->
 
-        <div>
-            <div class="brand">Asogli Hall</div>
-            <div class="brand-subtitle">
-                Administration Portal
-            </div>
+    <header class="mobile-header">
+
+        <button
+            id="mobileMenuButton"
+            class="mobile-menu-button"
+            type="button"
+            aria-label="Open navigation"
+        >
+            ☰
+        </button>
+
+        <div class="mobile-brand">
+            <strong>ASOGLI HALL</strong>
+            <span>Administration</span>
         </div>
 
-        <div class="topbar-actions">
+        <span id="mobileAdminRole" class="role-badge"></span>
 
-            <span id="adminRole" class="role-badge"></span>
+    </header>
 
-            <button id="refreshButton" class="secondary-button">
-                Refresh
-            </button>
 
-            <button id="logoutButton" class="secondary-button">
+    <!-- SIDEBAR -->
+
+    <aside id="adminSidebar" class="sidebar">
+
+        <div class="sidebar-brand">
+
+            <div class="brand-symbol">
+                AH
+            </div>
+
+            <div>
+                <strong>ASOGLI HALL</strong>
+                <span>Administration</span>
+            </div>
+
+        </div>
+
+
+        <div class="sidebar-section">
+
+            <span class="sidebar-label">
+                MAIN
+            </span>
+
+            <nav class="sidebar-nav">
+
+                <button
+                    class="nav-item active"
+                    type="button"
+                    data-section="dashboardSection"
+                >
+                    <span class="nav-icon">⌂</span>
+                    <span>Dashboard</span>
+                </button>
+
+                <button
+                    class="nav-item"
+                    type="button"
+                    data-section="roomsSection"
+                >
+                    <span class="nav-icon">▦</span>
+                    <span>Rooms</span>
+                </button>
+
+                <button
+                    class="nav-item"
+                    type="button"
+                    data-section="allocationsSection"
+                >
+                    <span class="nav-icon">☷</span>
+                    <span>Allocations</span>
+                </button>
+
+                <button
+                    class="nav-item"
+                    type="button"
+                    data-section="unallocatedSection"
+                >
+                    <span class="nav-icon">!</span>
+                    <span>Unallocated</span>
+                </button>
+
+            </nav>
+
+        </div>
+
+
+        <div class="sidebar-section">
+
+            <span class="sidebar-label">
+                MANAGEMENT
+            </span>
+
+            <nav class="sidebar-nav">
+
+                <button
+                    class="nav-item"
+                    type="button"
+                    data-section="auditSection"
+                >
+                    <span class="nav-icon">◷</span>
+                    <span>Audit Log</span>
+                </button>
+
+                <button
+                    class="nav-item"
+                    type="button"
+                    data-section="reportsSection"
+                >
+                    <span class="nav-icon">▤</span>
+                    <span>Reports</span>
+                </button>
+
+                <button
+                    id="administratorsNavItem"
+                    class="nav-item"
+                    type="button"
+                    data-section="adminManagementSection"
+                    style="display:none;"
+                >
+                    <span class="nav-icon">♙</span>
+                    <span>Administrators</span>
+                </button>
+
+            </nav>
+
+        </div>
+
+
+        <div class="sidebar-bottom">
+
+            <div class="sidebar-user">
+
+                <div class="user-avatar">
+                    A
+                </div>
+
+                <div class="sidebar-user-info">
+
+                    <strong>Administrator</strong>
+
+                    <span id="sidebarAdminRole">
+                        Administrator
+                    </span>
+
+                </div>
+
+            </div>
+
+            <button
+                id="logoutButton"
+                class="sidebar-logout"
+                type="button"
+            >
+                <span>↪</span>
                 Sign out
             </button>
 
         </div>
 
-    </header>
+    </aside>
 
 
-    <main class="container">
+    <!-- MAIN CONTENT -->
 
-        <section class="page-heading">
+    <main class="main-content">
+
+        <!-- TOP BAR -->
+
+        <header class="topbar">
 
             <div>
-                <p class="eyebrow">OVERVIEW</p>
 
-                <h1>Allocation dashboard</h1>
-
-                <p>
-                    Monitor rooms, beds, students and allocation activity.
+                <p class="eyebrow">
+                    UHAS ASOGLI HALL
                 </p>
+
+                <h1 id="pageTitle">
+                    Dashboard
+                </h1>
+
             </div>
 
-            <div id="lastUpdated" class="muted"></div>
+            <div class="topbar-actions">
 
-        </section>
+                <span id="adminRole" class="role-badge"></span>
 
+                <span id="lastUpdated" class="last-updated"></span>
 
-        <section class="stats-grid">
+                <button
+                    id="refreshButton"
+                    class="secondary-button"
+                    type="button"
+                >
+                    Refresh
+                </button>
 
-            <article class="stat-card">
-                <span>Total rooms</span>
-                <strong id="totalRooms">—</strong>
-            </article>
+            </div>
 
-            <article class="stat-card">
-                <span>Total beds</span>
-                <strong id="totalBeds">—</strong>
-            </article>
-
-            <article class="stat-card">
-                <span>Occupied beds</span>
-                <strong id="occupiedBeds">—</strong>
-            </article>
-
-            <article class="stat-card">
-                <span>Available beds</span>
-                <strong id="availableBeds">—</strong>
-            </article>
-
-            <article class="stat-card">
-                <span>Active holds</span>
-                <strong id="activeHolds">—</strong>
-            </article>
-
-            <article class="stat-card">
-                <span>Active allocations</span>
-                <strong id="activeAllocations">—</strong>
-            </article>
-
-            <article class="stat-card">
-                <span>Unallocated eligible</span>
-                <strong id="unallocatedStudents">—</strong>
-            </article>
-
-            <article class="stat-card">
-                <span>Allocation status</span>
-                <strong id="allocationStatus">—</strong>
-            </article>
-
-        </section>
+        </header>
 
 
-        <section class="panel">
+        <!-- =================================================
+             DASHBOARD
+             ================================================= -->
 
-            <div class="panel-heading">
+        <section
+            id="dashboardSection"
+            class="admin-section active-section"
+        >
+
+            <div class="section-heading">
 
                 <div>
+
+                    <p class="eyebrow">
+                        OVERVIEW
+                    </p>
+
+                    <h2>Allocation dashboard</h2>
+
+                    <p>
+                        A real-time overview of rooms, beds and allocation activity.
+                    </p>
+
+                </div>
+
+            </div>
+
+
+            <div class="stats-grid">
+
+                <article class="stat-card">
+                    <div class="stat-label">
+                        Total rooms
+                    </div>
+
+                    <strong id="totalRooms">
+                        —
+                    </strong>
+
+                    <span class="stat-description">
+                        Available rooms
+                    </span>
+                </article>
+
+
+                <article class="stat-card">
+                    <div class="stat-label">
+                        Total beds
+                    </div>
+
+                    <strong id="totalBeds">
+                        —
+                    </strong>
+
+                    <span class="stat-description">
+                        Hall capacity
+                    </span>
+                </article>
+
+
+                <article class="stat-card">
+                    <div class="stat-label">
+                        Occupied beds
+                    </div>
+
+                    <strong id="occupiedBeds">
+                        —
+                    </strong>
+
+                    <span class="stat-description">
+                        Currently occupied
+                    </span>
+                </article>
+
+
+                <article class="stat-card">
+                    <div class="stat-label">
+                        Available beds
+                    </div>
+
+                    <strong id="availableBeds">
+                        —
+                    </strong>
+
+                    <span class="stat-description">
+                        Ready for allocation
+                    </span>
+                </article>
+
+
+                <article class="stat-card">
+                    <div class="stat-label">
+                        Active holds
+                    </div>
+
+                    <strong id="activeHolds">
+                        —
+                    </strong>
+
+                    <span class="stat-description">
+                        Temporary holds
+                    </span>
+                </article>
+
+
+                <article class="stat-card">
+                    <div class="stat-label">
+                        Active allocations
+                    </div>
+
+                    <strong id="activeAllocations">
+                        —
+                    </strong>
+
+                    <span class="stat-description">
+                        Confirmed allocations
+                    </span>
+                </article>
+
+
+                <article class="stat-card">
+                    <div class="stat-label">
+                        Unallocated
+                    </div>
+
+                    <strong id="unallocatedStudents">
+                        —
+                    </strong>
+
+                    <span class="stat-description">
+                        Eligible students
+                    </span>
+                </article>
+
+
+                <article class="stat-card">
+                    <div class="stat-label">
+                        Allocation status
+                    </div>
+
+                    <strong id="allocationStatus">
+                        —
+                    </strong>
+
+                    <span class="stat-description">
+                        Current system state
+                    </span>
+                </article>
+
+            </div>
+
+
+            <div class="dashboard-grid">
+
+                <section class="content-card">
+
+                    <div class="card-heading">
+
+                        <div>
+                            <h3>Room overview</h3>
+
+                            <p>
+                                Select a room to inspect occupants.
+                            </p>
+                        </div>
+
+                        <button
+                            class="text-button"
+                            type="button"
+                            data-section="roomsSection"
+                        >
+                            View rooms →
+                        </button>
+
+                    </div>
+
+                    <div class="dashboard-room-placeholder">
+    <p>Room information is available in the Rooms section.</p>
+
+    <button
+        class="text-button"
+        type="button"
+        data-section="roomsSection"
+    >
+        Open Rooms →
+    </button>
+</div>
+                </section>
+
+            </div>
+
+        </section>
+
+
+        <!-- =================================================
+             ROOMS
+             ================================================= -->
+
+        <section
+            id="roomsSection"
+            class="admin-section"
+        >
+
+            <div class="section-heading">
+
+                <div>
+
+                    <p class="eyebrow">
+                        ACCOMMODATION
+                    </p>
+
                     <h2>Rooms</h2>
-                    <p>Click a room to inspect its occupants.</p>
+
+                    <p>
+                        Monitor room occupancy and available beds.
+                    </p>
+
                 </div>
 
                 <select id="blockFilter">
@@ -181,21 +539,49 @@
 
             </div>
 
-            <div id="roomsGrid" class="rooms-grid"></div>
 
+            <section class="content-card">
+
+
+            </section>
+<div
+    id="roomsGrid"
+    class="rooms-grid"
+></div>
         </section>
 
 
-        <section class="panel">
+        <!-- =================================================
+             ALLOCATIONS
+             ================================================= -->
 
-            <div class="panel-heading">
+        <section
+            id="allocationsSection"
+            class="admin-section"
+        >
+
+            <div class="section-heading">
 
                 <div>
+
+                    <p class="eyebrow">
+                        STUDENTS
+                    </p>
+
                     <h2>Student allocations</h2>
-                    <p>Search confirmed room assignments.</p>
+
+                    <p>
+                        Search and review confirmed room assignments.
+                    </p>
+
                 </div>
 
-                <div class="filters">
+            </div>
+
+
+            <section class="content-card">
+
+                <div class="filter-bar">
 
                     <input
                         id="studentSearch"
@@ -219,203 +605,439 @@
 
                 </div>
 
-            </div>
 
-            <div class="table-wrapper">
+                <div class="table-wrapper">
 
-                <table>
+                    <table>
 
-                    <thead>
-                        <tr>
-                            <th>Student ID</th>
-                            <th>Name</th>
-                            <th>Level</th>
-                            <th>Gender</th>
-                            <th>Block</th>
-                            <th>Room</th>
-                            <th>Bed</th>
-                            <th>Allocation</th>
-                        </tr>
-                    </thead>
+                        <thead>
 
-                    <tbody id="allocationsTable"></tbody>
+                            <tr>
+                               <th>Student ID</th>
+<th>Name</th>
+<th>Level</th>
+<th>Gender</th>
+<th>Block</th>
+<th>Room</th>
+<th>Bed</th>
+<th>Allocation</th>
+<th>Action</th>
+                            </tr>
 
-                </table>
+                        </thead>
 
-            </div>
+                        <tbody id="allocationsTable"></tbody>
+
+                    </table>
+
+                </div>
+
+            </section>
 
         </section>
 
 
-        <section class="panel">
+        <!-- =================================================
+             UNALLOCATED
+             ================================================= -->
 
-            <div class="panel-heading">
+        <section
+            id="unallocatedSection"
+            class="admin-section"
+        >
+
+            <div class="section-heading">
 
                 <div>
+
+                    <p class="eyebrow">
+                        STUDENT MANAGEMENT
+                    </p>
+
                     <h2>Unallocated students</h2>
-                    <p>Eligible students without an active allocation.</p>
+
+                    <p>
+                        Eligible students without an active allocation.
+                    </p>
+
                 </div>
 
+            </div>
+
+
+            <section class="content-card">
+
+                <div class="filter-bar">
+
+                    <input
+                        id="unallocatedSearch"
+                        type="search"
+                        placeholder="Search students"
+                    >
+
+                </div>
+
+
+                <div class="table-wrapper">
+
+                    <table>
+
+                        <thead>
+
+                            <tr>
+                                <th>Student ID</th>
+                                <th>Name</th>
+                                <th>Level</th>
+                                <th>Programme</th>
+                                <th>Gender</th>
+                                <th>Email</th>
+                            </tr>
+
+                        </thead>
+
+                        <tbody id="unallocatedTable"></tbody>
+
+                    </table>
+
+                </div>
+
+            </section>
+
+        </section>
+
+
+        <!-- =================================================
+             AUDIT
+             ================================================= -->
+
+        <section
+            id="auditSection"
+            class="admin-section"
+        >
+
+            <div class="section-heading">
+
+                <div>
+
+                    <p class="eyebrow">
+                        SYSTEM ACTIVITY
+                    </p>
+
+                    <h2>Audit log</h2>
+
+                    <p>
+                        Review recent allocation and system activity.
+                    </p>
+
+                </div>
+
+            </div>
+
+
+            <section class="content-card">
+
+                <div class="table-wrapper">
+
+                    <table>
+
+                        <thead>
+
+                            <tr>
+                                <th>Time</th>
+                                <th>Action</th>
+                                <th>Entity</th>
+                                <th>Entity ID</th>
+                                <th>Details</th>
+                            </tr>
+
+                        </thead>
+
+                        <tbody id="auditTable"></tbody>
+
+                    </table>
+
+                </div>
+
+            </section>
+
+        </section>
+
+
+        <!-- =================================================
+             REPORTS
+             ================================================= -->
+
+        <section
+            id="reportsSection"
+            class="admin-section"
+        >
+
+            <div class="section-heading">
+
+                <div>
+
+                    <p class="eyebrow">
+                        REPORTING
+                    </p>
+
+                    <h2>Reports</h2>
+
+                    <p>
+                        Export and print current allocation information.
+                    </p>
+
+                </div>
+
+            </div>
+
+
+            <section class="content-card report-card">
+
+                <div class="report-icon">
+                    ▤
+                </div>
+
+                <div class="report-content">
+
+                    <h3>Allocation reports</h3>
+
+                    <p>
+                        Download allocation data or generate a printable report
+                        for administrative use.
+                    </p>
+
+                    <div class="report-actions">
+
+                        <button
+                            id="exportAllocations"
+                            class="primary-button"
+                            type="button"
+                        >
+                            Export allocations CSV
+                        </button>
+
+                        <button
+                            id="exportUnallocated"
+                            class="secondary-button"
+                            type="button"
+                        >
+                            Export unallocated CSV
+                        </button>
+
+                        <button
+                            id="printReport"
+                            class="secondary-button"
+                            type="button"
+                        >
+                            Print report
+                        </button>
+
+                    </div>
+
+                </div>
+
+            </section>
+
+        </section>
+
+
+        <!-- =================================================
+             ADMINISTRATORS
+             ================================================= -->
+
+        <section
+            id="adminManagementSection"
+            class="admin-section"
+            style="display:none;"
+        >
+
+            <div class="section-heading admin-management-heading">
+
+                <div>
+
+                    <p class="eyebrow">
+                        ACCESS CONTROL
+                    </p>
+
+                    <h2>Administrators</h2>
+
+                    <p>
+                        Manage administrator accounts and access levels.
+                    </p>
+
+                </div>
+
+                <button
+                    id="addAdminButton"
+                    class="primary-button"
+                    type="button"
+                >
+                    + Add Administrator
+                </button>
+
+            </div>
+
+
+            <section class="content-card">
+
+                <div class="table-wrapper">
+
+                    <table>
+
+                        <thead>
+
+                            <tr>
+                                <th>Email</th>
+                                <th>Role</th>
+                                <th>Created</th>
+                                <th>Actions</th>
+                            </tr>
+
+                        </thead>
+
+                        <tbody id="administratorsTableBody">
+
+                            <tr>
+                                <td colspan="4">
+                                    Loading administrators…
+                                </td>
+                            </tr>
+
+                        </tbody>
+
+                    </table>
+
+                </div>
+
+            </section>
+
+        </section>
+
+    </main>
+
+</div>
+
+
+<!-- =========================================================
+     ADMINISTRATOR MODAL
+     ========================================================= -->
+
+<div
+    id="adminManagementModal"
+    class="modal"
+    style="display:none;"
+>
+
+    <div class="modal-backdrop"></div>
+
+    <div class="modal-content">
+
+        <div class="modal-header">
+
+            <div>
+
+                <p class="eyebrow">
+                    ACCESS CONTROL
+                </p>
+
+                <h2 id="adminModalTitle">
+                    Add Administrator
+                </h2>
+
+            </div>
+
+            <button
+                id="closeAdminModalButton"
+                type="button"
+                class="modal-close"
+                aria-label="Close"
+            >
+                ×
+            </button>
+
+        </div>
+
+
+        <form id="adminForm">
+
+            <div class="form-group">
+
+                <label for="adminEmail">
+                    Email address
+                </label>
+
                 <input
-                    id="unallocatedSearch"
-                    type="search"
-                    placeholder="Search students"
+                    id="adminEmail"
+                    type="email"
+                    autocomplete="off"
+                    placeholder="administrator@example.com"
+                    required
                 >
 
             </div>
 
-            <div class="table-wrapper">
 
-                <table>
+            <div class="form-group">
 
-                    <thead>
-                        <tr>
-                            <th>Student ID</th>
-                            <th>Name</th>
-                            <th>Level</th>
-                            <th>Programme</th>
-                            <th>Gender</th>
-                            <th>Email</th>
-                        </tr>
-                    </thead>
+                <label for="adminPassword">
+                    Temporary password
+                </label>
 
-                    <tbody id="unallocatedTable"></tbody>
-
-                </table>
+                <input
+                    id="adminPassword"
+                    type="password"
+                    minlength="8"
+                    autocomplete="new-password"
+                    placeholder="Minimum 8 characters"
+                    required
+                >
 
             </div>
 
-        </section>
 
+            <div class="form-group">
 
-        <section class="panel">
+                <label for="adminRoleSelect">
+                    Access level
+                </label>
 
-            <div class="panel-heading">
+                <select id="adminRoleSelect" required>
 
-                <div>
-                    <h2>Audit log</h2>
-                    <p>Recent allocation and system activity.</p>
-                </div>
+                    <option value="admin">
+                        Administrator
+                    </option>
 
-            </div>
+                    <option value="super_admin">
+                        Super Administrator
+                    </option>
 
-            <div class="table-wrapper">
-
-                <table>
-
-                    <thead>
-                        <tr>
-                            <th>Time</th>
-                            <th>Action</th>
-                            <th>Entity</th>
-                            <th>Entity ID</th>
-                            <th>Details</th>
-                        </tr>
-                    </thead>
-
-                    <tbody id="auditTable"></tbody>
-
-                </table>
+                </select>
 
             </div>
 
-        </section>
 
+            <div class="role-help">
 
-        <section class="panel report-panel">
+                <strong>Administrator</strong>
 
-            <div class="panel-heading">
+                <span>
+                    Can manage hall operations and view administrative data.
+                </span>
 
-                <div>
-                    <h2>Reports</h2>
-                    <p>Export the current allocation information.</p>
-                </div>
+                <strong>Super Administrator</strong>
 
-                <div class="report-actions">
-
-                    <button id="exportAllocations" class="secondary-button">
-                        Export allocations CSV
-                    </button>
-
-                    <button id="exportUnallocated" class="secondary-button">
-                        Export unallocated CSV
-                    </button>
-
-                    <button id="printReport" class="secondary-button">
-                        Print report
-                    </button>
-
-                </div>
+                <span>
+                    Has full administrative access, including administrator management.
+                </span>
 
             </div>
 
-        </section>
-<section id="adminManagementSection" class="panel" style="display:none;">
-    <div class="panel-header">
-        <div>
-            <h2>Administrator Management</h2>
-            <p>Manage administrator accounts and access.</p>
-        </div>
-        <button id="addAdminButton" class="primary-button" type="button">
-            + Add Administrator
-        </button>
-    </div>
-
-    <div class="table-wrap">
-        <table>
-            <thead>
-                <tr>
-                    <th>Email</th>
-                    <th>Role</th>
-                    <th>Created</th>
-                    <th>Actions</th>
-                </tr>
-            </thead>
-            <tbody id="administratorsTableBody">
-                <tr>
-                    <td colspan="4">Loading administrators…</td>
-                </tr>
-            </tbody>
-        </table>
-    </div>
-</section>
-
-<div id="adminManagementModal" class="modal" style="display:none;">
-    <div class="modal-content">
-        <div class="modal-header">
-            <h2 id="adminModalTitle">Add Administrator</h2>
-            <button id="closeAdminModalButton" type="button" class="modal-close">
-                &times;
-            </button>
-        </div>
-
-        <form id="adminForm">
-            <label for="adminEmail">Email address</label>
-            <input
-                id="adminEmail"
-                type="email"
-                autocomplete="off"
-                required
-            >
-
-            <label for="adminPassword">Temporary password</label>
-            <input
-                id="adminPassword"
-                type="password"
-                minlength="8"
-                autocomplete="new-password"
-                required
-            >
-
-            <label for="adminRoleSelect">Role</label>
-            <select id="adminRoleSelect" required>
-                <option value="admin">Admin</option>
-                <option value="super_admin">Super Admin</option>
-            </select>
 
             <p id="adminFormError" class="error"></p>
 
+
             <div class="modal-actions">
+
                 <button
                     id="cancelAdminButton"
                     type="button"
@@ -431,16 +1053,24 @@
                 >
                     Create Administrator
                 </button>
+
             </div>
+
         </form>
+
     </div>
-</div>
-    </main>
 
 </div>
 
 
-<div id="roomModal" class="modal hidden">
+<!-- =========================================================
+     ROOM DETAILS MODAL
+     ========================================================= -->
+
+<div
+    id="roomModal"
+    class="modal hidden"
+>
 
     <div class="modal-backdrop"></div>
 
@@ -449,25 +1079,48 @@
         <div class="modal-header">
 
             <div>
-                <p class="eyebrow">ROOM DETAILS</p>
-                <h2 id="modalRoomTitle">Room</h2>
+
+                <p class="eyebrow">
+                    ROOM DETAILS
+                </p>
+
+                <h2 id="modalRoomTitle">
+                    Room
+                </h2>
+
                 <p id="modalRoomSubtitle"></p>
+
             </div>
 
-            <button id="closeModal" class="close-button">
+            <button
+                id="closeModal"
+                class="close-button"
+                type="button"
+                aria-label="Close"
+            >
                 ×
             </button>
 
         </div>
 
-        <div id="roomOccupants" class="occupants"></div>
+        <div
+            id="roomOccupants"
+            class="occupants"
+        ></div>
 
     </div>
 
 </div>
 
 
-<div id="toast" class="toast"></div>
+<!-- =========================================================
+     TOAST
+     ========================================================= -->
+
+<div
+    id="toast"
+    class="toast"
+></div>
 
 </body>
 </html>

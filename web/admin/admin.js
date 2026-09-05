@@ -643,11 +643,55 @@ function renderAllocations() {
                     )}
                 </td>
 
-                <td>
+                                <td>
                     ${escapeHtml(
                         row.allocation_number ??
                         "—"
                     )}
+                </td>
+
+                                <td>
+
+                    ${
+                        $("#adminRole")
+                            ?.textContent
+                            ?.trim()
+                            ?.toLowerCase() ===
+                        "super admin"
+
+                            ? `
+                                <div class="table-actions">
+
+                                    <button
+                                        type="button"
+                                        class="table-action"
+                                        data-reassign-allocation="${escapeHtml(
+                                            row.id
+                                        )}"
+                                    >
+                                        Reassign
+                                    </button>
+
+                                    <button
+                                        type="button"
+                                        class="table-action danger"
+                                        data-unassign-allocation="${escapeHtml(
+                                            row.id
+                                        )}"
+                                    >
+                                        Unassign
+                                    </button>
+
+                                </div>
+                              `
+
+                            : `
+                                <span class="muted-text">
+                                    —
+                                </span>
+                              `
+                    }
+
                 </td>
 
             </tr>
@@ -655,7 +699,297 @@ function renderAllocations() {
         `).join("");
 }
 
+async function reassignStudent(allocationId) {
 
+    if (!allocationId) {
+
+        showToast(
+            "Allocation ID is missing.",
+            "error"
+        );
+
+        return;
+    }
+
+
+    if (
+        $("#adminRole")
+            ?.textContent
+            ?.trim()
+            ?.toLowerCase() !==
+        "super admin"
+    ) {
+
+        showToast(
+            "Super Admin privileges are required.",
+            "error"
+        );
+
+        return;
+    }
+
+
+    const allocation =
+        (currentAllocations || []).find(
+            (row) =>
+                String(row.id) ===
+                String(allocationId)
+        );
+
+
+    if (!allocation) {
+
+        showToast(
+            "Allocation details could not be found.",
+            "error"
+        );
+
+        return;
+    }
+
+
+    let availableBeds = [];
+
+
+    try {
+
+        availableBeds =
+            await rpc(
+                "admin_available_beds",
+                {
+                    p_gender:
+                        allocation.gender || null
+                }
+            );
+
+    } catch (error) {
+
+        console.error(
+            "Available beds error:",
+            error
+        );
+
+        showToast(
+            error.message ||
+            "Unable to load available beds.",
+            "error"
+        );
+
+        return;
+    }
+
+
+    if (!Array.isArray(availableBeds)) {
+
+        showToast(
+            "Unable to load available beds.",
+            "error"
+        );
+
+        return;
+    }
+
+
+    availableBeds =
+        availableBeds.map(
+            (bed) => ({
+                id:
+                    bed.bed_id,
+
+                label:
+    String(bed.block || "") +
+    " - " +
+    String(
+        bed.room_code ||
+        bed.room_number ||
+        ""
+    ) +
+    " - Bed " +
+    String(bed.bed_number)
+            })
+        );
+
+
+    if (!availableBeds.length) {
+
+        showToast(
+            "No suitable available beds were found.",
+            "error"
+        );
+
+        return;
+    }
+
+
+    const selection =
+        window.prompt(
+            "Enter the number of the destination bed:\n\n" +
+            availableBeds
+                .map(
+                    (bed, index) =>
+                        `${index + 1}. ${bed.label}`
+                )
+                .join("\n")
+        );
+
+
+    if (
+        selection === null ||
+        selection.trim() === ""
+    ) {
+
+        return;
+    }
+
+
+    const index =
+        Number(selection) - 1;
+
+
+    if (
+        !Number.isInteger(index) ||
+        index < 0 ||
+        index >= availableBeds.length
+    ) {
+
+        showToast(
+            "Invalid bed selection.",
+            "error"
+        );
+
+        return;
+    }
+
+
+    const destination =
+        availableBeds[index];
+
+
+    const confirmed =
+        window.confirm(
+            "Confirm reassignment?\n\n" +
+            `Student: ${allocation.student_name}\n` +
+            `Destination: ${destination.label}\n\n` +
+            "The student's current bed will be released " +
+            "and the selected bed will become occupied."
+        );
+
+
+    if (!confirmed) {
+        return;
+    }
+
+
+    try {
+
+        const result =
+            await rpc(
+                "reassign_student",
+                {
+                    p_allocation_id:
+                        allocationId,
+
+                    p_new_bed_id:
+                        destination.id
+                }
+            );
+
+
+        if (!result?.success) {
+
+            throw new Error(
+                result?.message ||
+                "Unable to reassign student."
+            );
+
+        }
+
+
+        showToast(
+            "Student successfully reassigned.",
+            "success"
+        );
+
+
+        await loadEverything();
+
+    } catch (error) {
+
+        console.error(
+            "Reassign student error:",
+            error
+        );
+
+
+        showToast(
+            error.message ||
+            "Unable to reassign student.",
+            "error"
+        );
+
+    }
+
+}
+
+async function unassignStudent(allocationId) {
+
+    if (!allocationId) {
+        showToast(
+            "Allocation ID is missing.",
+            "error"
+        );
+        return;
+    }
+
+    const confirmed =
+        window.confirm(
+            "Are you sure you want to unassign this student?\n\n" +
+            "The student's allocation will be revoked and the bed will become available."
+        );
+
+    if (!confirmed) {
+        return;
+    }
+
+    try {
+
+        const result =
+            await rpc(
+                "unassign_student",
+                {
+                    p_allocation_id:
+                        allocationId
+                }
+            );
+
+        if (!result?.success) {
+            throw new Error(
+                result?.message ||
+                "Unable to unassign student."
+            );
+        }
+
+        showToast(
+            "Student successfully unassigned.",
+            "success"
+        );
+
+        await loadEverything();
+
+    } catch (error) {
+
+        console.error(
+            "Unassign student error:",
+            error
+        );
+
+        showToast(
+            error.message ||
+            "Unable to unassign student.",
+            "error"
+        );
+    }
+}
 /* ============================================================
    Unallocated students
    ============================================================ */
@@ -944,7 +1278,83 @@ function downloadCsv(
     URL.revokeObjectURL(url);
 }
 
+/* ============================================================
+   REPORT BUTTONS
+   ============================================================ */
 
+function exportAllocationsReport() {
+
+    downloadCsv(
+        "uhas-asogli-allocations.csv",
+        currentAllocations
+    );
+
+}
+
+
+function exportUnallocatedReport() {
+
+    downloadCsv(
+        "uhas-asogli-unallocated-students.csv",
+        currentUnallocated
+    );
+
+}
+
+
+function printReport() {
+
+    window.print();
+
+}
+
+
+/* ============================================================
+   REPORT BUTTON INITIALISATION
+   ============================================================ */
+
+function initialiseReportButtons() {
+
+    const exportAllocations =
+        $("#exportAllocations");
+
+    const exportUnallocated =
+        $("#exportUnallocated");
+
+    const printReportButton =
+        $("#printReport");
+
+
+    if (exportAllocations) {
+
+        exportAllocations.addEventListener(
+            "click",
+            exportAllocationsReport
+        );
+
+    }
+
+
+    if (exportUnallocated) {
+
+        exportUnallocated.addEventListener(
+            "click",
+            exportUnallocatedReport
+        );
+
+    }
+
+
+    if (printReportButton) {
+
+        printReportButton.addEventListener(
+            "click",
+            printReport
+        );
+
+    }
+
+}
 /* ============================================================
    Login
    ============================================================ */
@@ -1222,64 +1632,217 @@ $("#allocationBlockFilter")
         "change",
         loadAllocations
     );
+/* ============================================================
+   Allocation actions
+   ============================================================ */
 
-$("#studentSearch")
-    .addEventListener(
-        "input",
-        loadAllocations
-    );
+const allocationsTable =
+    $("#allocationsTable");
 
-$("#unallocatedSearch")
-    .addEventListener(
-        "input",
-        loadUnallocated
-    );
+if (allocationsTable) {
 
-$("#closeModal")
-    .addEventListener(
+    allocationsTable.addEventListener(
         "click",
-        () =>
-            $("#roomModal")
-                .classList
-                .add("hidden")
+        async (event) => {
+
+            const reassignButton =
+                event.target.closest(
+                    "[data-reassign-allocation]"
+                );
+
+            const unassignButton =
+                event.target.closest(
+                    "[data-unassign-allocation]"
+                );
+
+
+            if (reassignButton) {
+
+                const allocationId =
+                    reassignButton.dataset
+                        .reassignAllocation;
+
+                await reassignStudent(
+                    allocationId
+                );
+
+                return;
+            }
+
+
+            if (unassignButton) {
+
+                const allocationId =
+                    unassignButton.dataset
+                        .unassignAllocation;
+
+                unassignButton.disabled = true;
+
+                unassignButton.textContent =
+                    "Unassigning…";
+
+                try {
+
+                    await unassignStudent(
+                        allocationId
+                    );
+
+                } finally {
+
+                    unassignButton.disabled =
+                        false;
+
+                    unassignButton.textContent =
+                        "Unassign";
+
+                }
+
+            }
+
+        }
     );
 
-$(".modal-backdrop")
-    .addEventListener(
-        "click",
-        () =>
-            $("#roomModal")
-                .classList
-                .add("hidden")
+}
+/* =========================================================
+   ADMIN DASHBOARD NAVIGATION
+   ========================================================= */
+
+function initialiseAdminNavigation() {
+
+    const navItems =
+        document.querySelectorAll(
+            ".nav-item[data-section]"
+        );
+
+    const sections =
+        document.querySelectorAll(
+            ".admin-section"
+        );
+
+    const pageTitle =
+        document.querySelector("#pageTitle");
+
+    const mobileMenuButton =
+        document.querySelector("#mobileMenuButton");
+
+    const sidebar =
+        document.querySelector("#adminSidebar");
+
+    const titleMap = {
+        dashboardSection: "Dashboard",
+        roomsSection: "Rooms",
+        allocationsSection: "Allocations",
+        unallocatedSection: "Unallocated Students",
+        auditSection: "Audit Log",
+        reportsSection: "Reports",
+        adminManagementSection: "Administrators"
+    };
+
+    function showSection(sectionId) {
+
+        sections.forEach(
+            (section) => {
+
+                section.classList.toggle(
+                    "active-section",
+                    section.id === sectionId
+                );
+
+            }
+        );
+
+        navItems.forEach(
+            (item) => {
+
+                item.classList.toggle(
+                    "active",
+                    item.dataset.section === sectionId
+                );
+
+            }
+        );
+
+        if (pageTitle) {
+
+            pageTitle.textContent =
+                titleMap[sectionId] ||
+                "Dashboard";
+
+        }
+
+        if (sidebar) {
+            sidebar.classList.remove(
+                "mobile-open"
+            );
+        }
+
+        window.scrollTo({
+            top: 0,
+            behavior: "smooth"
+        });
+    }
+
+    navItems.forEach(
+        (item) => {
+
+            item.addEventListener(
+                "click",
+                () => {
+
+                    showSection(
+                        item.dataset.section
+                    );
+
+                }
+            );
+
+        }
     );
 
-$("#exportAllocations")
-    .addEventListener(
-        "click",
-        () =>
-            downloadCsv(
-                "asogli-hall-allocations.csv",
-                currentAllocations
-            )
-    );
+    document
+        .querySelectorAll(
+            "[data-section]:not(.nav-item)"
+        )
+        .forEach(
+            (button) => {
 
-$("#exportUnallocated")
-    .addEventListener(
-        "click",
-        () =>
-            downloadCsv(
-                "asogli-hall-unallocated.csv",
-                currentUnallocated
-            )
-    );
+                button.addEventListener(
+                    "click",
+                    () => {
 
-$("#printReport")
-    .addEventListener(
-        "click",
-        () =>
-            window.print()
-    );
+                        showSection(
+                            button.dataset.section
+                        );
 
+                    }
+                );
+
+            }
+        );
+
+    if (mobileMenuButton && sidebar) {
+
+        mobileMenuButton.addEventListener(
+            "click",
+            () => {
+
+                sidebar.classList.toggle(
+                    "mobile-open"
+                );
+
+            }
+        );
+
+    }
+
+    showSection(
+        "dashboardSection"
+    );
+}
+
+initialiseAdminNavigation();
+
+initialiseReportButtons();
 
 initialise();
 // ============================================================
@@ -1555,10 +2118,14 @@ async function removeAdministrator(id) {
         );
     }
 }
-
+```js
 function initialiseAdminManagement() {
+
     const managementSection =
         $("#adminManagementSection");
+
+    const managementNavItem =
+        $("#administratorsNavItem");
 
     if (!managementSection) return;
 
@@ -1567,12 +2134,34 @@ function initialiseAdminManagement() {
             ?.trim()
             ?.toLowerCase();
 
-    if (role !== "super admin") {
-        managementSection.style.display = "none";
+    const isSuperAdmin =
+        role === "super admin";
+
+
+    /*
+     * Administrators is a Super Admin-only area.
+     */
+    if (managementNavItem) {
+
+        managementNavItem.style.display =
+            isSuperAdmin
+                ? ""
+                : "none";
+    }
+
+
+    if (!isSuperAdmin) {
+
+        managementSection.style.display =
+            "none";
+
         return;
     }
 
-    managementSection.style.display = "block";
+
+    managementSection.style.display =
+        "block";
+
 
     $("#addAdminButton")
         ?.addEventListener(
@@ -1580,11 +2169,13 @@ function initialiseAdminManagement() {
             openAdminManagementModal
         );
 
+
     $("#closeAdminModalButton")
         ?.addEventListener(
             "click",
             closeAdminManagementModal
         );
+
 
     $("#cancelAdminButton")
         ?.addEventListener(
@@ -1592,16 +2183,19 @@ function initialiseAdminManagement() {
             closeAdminManagementModal
         );
 
+
     $("#adminForm")
         ?.addEventListener(
             "submit",
             createAdministrator
         );
 
+
     $("#administratorsTableBody")
         ?.addEventListener(
             "click",
             (event) => {
+
                 const roleButton =
                     event.target.closest(
                         "[data-admin-role]"
@@ -1612,20 +2206,28 @@ function initialiseAdminManagement() {
                         "[data-admin-delete]"
                     );
 
+
                 if (roleButton) {
+
                     changeAdministratorRole(
                         roleButton.dataset.adminRole
                     );
+
                     return;
                 }
 
+
                 if (deleteButton) {
+
                     removeAdministrator(
                         deleteButton.dataset.adminDelete
                     );
                 }
+
             }
         );
 
+
     loadAdministrators();
 }
+```
