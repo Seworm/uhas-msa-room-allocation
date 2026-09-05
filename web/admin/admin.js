@@ -1408,14 +1408,6 @@ function renderAdministrators() {
     }).join("");
 }
 
-function escapeHtml(value) {
-    return String(value)
-        .replaceAll("&", "&amp;")
-        .replaceAll("<", "&lt;")
-        .replaceAll(">", "&gt;")
-        .replaceAll('"', "&quot;")
-        .replaceAll("'", "&#039;");
-}
 
 function openAdminManagementModal() {
     const modal = $("#adminManagementModal");
