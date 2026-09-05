@@ -1051,93 +1051,201 @@ async function unassignStudent(allocationId) {
         );
     }
 }
+
+async function assignUnallocatedStudent(studentId) {
+    if (!isSuperAdmin()) {
+        alert('Super Admin privileges are required.');
+        return;
+    }
+
+    const student = currentUnallocated.find(
+        row => String(row.id) === String(studentId)
+    );
+
+    if (!student) {
+        alert('Student could not be found.');
+        return;
+    }
+
+    if (!student.gender) {
+        alert(
+            'This student does not have a gender recorded. ' +
+            'Please update the student record before assigning a room.'
+        );
+        return;
+    }
+
+    try {
+        const beds = await rpc('admin_available_beds', {
+            p_gender: student.gender
+        });
+
+        if (!beds || !beds.length) {
+            alert(
+                `No suitable available beds were found for ${student.student_name}.`
+            );
+            return;
+        }
+
+        const options = beds.map((bed, index) => {
+            return `${index + 1}. ${bed.block} - ${bed.room_code} - Bed ${bed.bed_number}`;
+        });
+
+        const selection = window.prompt(
+            `Assign room to ${student.student_name}\n\n` +
+            options.join('\n') +
+            `\n\nEnter the number of the bed:`
+        );
+
+        if (selection === null) {
+            return;
+        }
+
+        const index = Number(selection) - 1;
+
+        if (
+            !Number.isInteger(index) ||
+            index < 0 ||
+            index >= beds.length
+        ) {
+            alert('Invalid bed selection.');
+            return;
+        }
+
+        const destination = beds[index];
+
+        const confirmed = window.confirm(
+            `Assign ${student.student_name}\n\n` +
+            `${destination.block} - ${destination.room_code} - Bed ${destination.bed_number}\n\n` +
+            `Do you want to continue?`
+        );
+
+        if (!confirmed) {
+            return;
+        }
+
+        const result = await rpc('admin_assign_student', {
+            p_student_id: student.id,
+            p_bed_id: destination.bed_id
+        });
+
+        if (!result || !result.success) {
+            throw new Error(
+                result?.message || 'Unable to assign student.'
+            );
+        }
+
+        alert(
+            `Student successfully assigned.\n\n` +
+            `${student.student_name}\n` +
+            `${result.block} - ${result.room_code} - Bed ${result.bed_number}\n` +
+            `Allocation: ${result.allocation_number}`
+        );
+
+        await Promise.all([
+            loadUnallocated(),
+            loadAllocations(),
+            loadDashboard()
+        ]);
+
+    } catch (error) {
+        console.error('assignUnallocatedStudent:', error);
+
+        alert(
+            error?.message ||
+            'Unable to assign the student. Please try again.'
+        );
+    }
+}
+
 /* ============================================================
    Unallocated students
    ============================================================ */
 
 async function loadUnallocated() {
+    const searchInput = document.querySelector('#unallocatedSearch');
 
-    currentUnallocated =
-        await rpc(
-            "admin_unallocated_students",
+    const search = searchInput
+        ? searchInput.value.trim()
+        : '';
+
+    try {
+        currentUnallocated = await rpc(
+            'admin_unallocated_students',
             {
-                p_search:
-                    $("#unallocatedSearch")
-                        .value
-                        .trim() || null
+                p_search: search || null
             }
         );
 
-    renderUnallocated();
+        renderUnallocated(currentUnallocated);
+
+    } catch (error) {
+        console.error('loadUnallocated:', error);
+
+        currentUnallocated = [];
+
+        renderUnallocated([]);
+    }
 }
 
 
-function renderUnallocated() {
+function renderUnallocated(rows) {
+    const tbody = document.querySelector('#unallocatedTableBody');
 
-    const tbody =
-        $("#unallocatedTable");
+    if (!tbody) return;
 
-    if (!currentUnallocated?.length) {
-
+    if (!rows || !rows.length) {
         tbody.innerHTML = `
             <tr>
-                <td colspan="6">
-                    <div class="empty-state">
-                        No unallocated eligible students found.
-                    </div>
+                <td colspan="7" class="empty-state">
+                    No unallocated students found.
                 </td>
             </tr>
         `;
-
         return;
     }
 
-    tbody.innerHTML =
-        currentUnallocated.map(row => `
+    tbody.innerHTML = rows.map(student => `
+        <tr>
+            <td>${escapeHtml(student.student_id || '')}</td>
 
-            <tr>
+            <td>
+                <strong>${escapeHtml(student.student_name || '')}</strong>
+            </td>
 
-                <td>
-                    ${escapeHtml(
-                        row.student_id
-                    )}
-                </td>
+            <td>${escapeHtml(student.level || '')}</td>
 
-                <td>
-                    <strong>
-                        ${escapeHtml(
-                            row.student_name
-                        )}
-                    </strong>
-                </td>
+            <td>${escapeHtml(student.programme || '')}</td>
 
-                <td>
-                    ${escapeHtml(
-                        row.level ?? "—"
-                    )}
-                </td>
+            <td>
+                ${escapeHtml(student.gender || 'Not set')}
+            </td>
 
-                <td>
-                    ${escapeHtml(
-                        row.programme ?? "—"
-                    )}
-                </td>
+            <td>
+                ${escapeHtml(student.email || '')}
+            </td>
 
-                <td>
-                    ${escapeHtml(
-                        row.gender ?? "—"
-                    )}
-                </td>
-
-                <td>
-                    ${escapeHtml(
-                        row.email ?? "—"
-                    )}
-                </td>
-
-            </tr>
-
-        `).join("");
+            <td>
+                ${
+                    isSuperAdmin()
+                        ? `
+                            <button
+                                type="button"
+                                class="btn btn-primary btn-sm"
+                                data-assign-student="${student.id}"
+                            >
+                                Assign Room
+                            </button>
+                          `
+                        : `
+                            <span class="muted">
+                                View only
+                            </span>
+                          `
+                }
+            </td>
+        </tr>
+    `).join('');
 }
 
 
@@ -1764,6 +1872,63 @@ if (allocationsTable) {
     );
 
 }
+
+/* ============================================================
+   Unallocated student actions
+   ============================================================ */
+
+const unallocatedTable =
+    $("#unallocatedTableBody");
+
+if (unallocatedTable) {
+
+    unallocatedTable.addEventListener(
+        "click",
+        async (event) => {
+
+            const assignButton =
+                event.target.closest(
+                    "[data-assign-student]"
+                );
+
+            if (!assignButton) {
+                return;
+            }
+
+            const studentId =
+                assignButton.dataset
+                    .assignStudent;
+
+            if (!studentId) {
+                return;
+            }
+
+            assignButton.disabled = true;
+
+            assignButton.textContent =
+                "Assigning…";
+
+            try {
+
+                await assignUnallocatedStudent(
+                    studentId
+                );
+
+            } finally {
+
+                assignButton.disabled =
+                    false;
+
+                assignButton.textContent =
+                    "Assign Room";
+
+            }
+
+        }
+    );
+
+}
+
 /* =========================================================
    ADMIN DASHBOARD NAVIGATION
    ========================================================= */
