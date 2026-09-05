@@ -2346,20 +2346,6 @@ function initialiseAdminManagement() {
    SEARCH
    ============================================================ */
 
-const studentSearch = $("#studentSearch");
-
-if (studentSearch) {
-    let searchTimer;
-
-    studentSearch.addEventListener("input", () => {
-        clearTimeout(searchTimer);
-
-        searchTimer = setTimeout(() => {
-            loadAllocations();
-        }, 300);
-    });
-}
-
 
 const unallocatedSearch = $("#unallocatedSearch");
 
