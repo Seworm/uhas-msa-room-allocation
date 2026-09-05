@@ -1096,6 +1096,95 @@ async function initialise() {
    Event listeners
    ============================================================ */
 
+/* ============================================================
+   Password reset
+   ============================================================ */
+
+$("#forgotPasswordLink")
+    .addEventListener(
+        "click",
+        async (event) => {
+
+            event.preventDefault();
+
+            const email =
+                $("#email")
+                    .value
+                    .trim();
+
+            const errorBox =
+                $("#loginError");
+
+            errorBox.textContent = "";
+
+            if (!email) {
+
+                errorBox.textContent =
+                    "Enter your administrator email address first.";
+
+                $("#email").focus();
+
+                return;
+            }
+
+            const link =
+                $("#forgotPasswordLink");
+
+            link.textContent =
+                "Sending reset link…";
+
+            link.style.pointerEvents =
+                "none";
+
+            try {
+
+                const {
+                    error
+                } =
+                    await supabase.auth
+                        .resetPasswordForEmail(
+                            email,
+                            {
+                                redirectTo:
+                                    `${window.location.origin}/admin/reset-password.html`
+                            }
+                        );
+
+                if (error) {
+                    throw error;
+                }
+
+                errorBox.className =
+                    "success";
+
+                errorBox.textContent =
+                    "Password reset link sent. Check your email.";
+
+            } catch (error) {
+
+                console.error(
+                    "Password reset error:",
+                    error
+                );
+
+                errorBox.className =
+                    "error";
+
+                errorBox.textContent =
+                    error.message ||
+                    "Unable to send password reset email.";
+
+            } finally {
+
+                link.textContent =
+                    "Forgot password?";
+
+                link.style.pointerEvents =
+                    "";
+            }
+        }
+    );
+
 $("#loginForm")
     .addEventListener(
         "submit",
