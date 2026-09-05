@@ -1992,3 +1992,496 @@ footer {
 .profile-gender > p {
   margin-bottom: 1rem;
 }
+/* ============================================================
+   UHAS ALLOCATION DETAILS — MODERN UI
+   ============================================================ */
+
+.allocation-details-panel {
+  width: 100%;
+  max-width: 980px;
+  margin-inline: auto;
+}
+
+
+.allocation-details-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+}
+
+
+.allocation-details-heading > div {
+  min-width: 0;
+}
+
+
+.allocation-status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+
+  flex: 0 0 auto;
+
+  padding: 8px 12px;
+
+  border: 1px solid #b9dfc8;
+  border-radius: 999px;
+
+  background: #edf9f1;
+
+  color: #087443;
+
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+
+
+.allocation-status-badge .status-dot {
+  width: 7px;
+  height: 7px;
+
+  border-radius: 50%;
+
+  background: #087443;
+}
+
+
+/* HERO */
+
+.allocation-hero {
+  display: grid;
+  grid-template-columns: 1.5fr 1fr;
+
+  margin-top: 24px;
+
+  overflow: hidden;
+
+  border-radius: 22px;
+
+  background:
+    linear-gradient(
+      135deg,
+      #043c28 0%,
+      #075b3a 55%,
+      #087b4c 100%
+    );
+
+  color: #ffffff;
+
+  box-shadow:
+    0 18px 45px rgba(3, 46, 31, .20);
+}
+
+
+.allocation-hero-main,
+.allocation-hero-room {
+  padding: 28px;
+}
+
+
+.allocation-hero-room {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+
+  border-left: 1px solid rgba(255,255,255,.14);
+
+  background: rgba(255,255,255,.05);
+}
+
+
+.allocation-hero-label {
+  display: block;
+
+  margin-bottom: 7px;
+
+  color: rgba(255,255,255,.65);
+
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: .13em;
+}
+
+
+.allocation-number {
+  display: block;
+
+  font-size: clamp(25px, 4vw, 38px);
+
+  line-height: 1.05;
+
+  letter-spacing: -.025em;
+}
+
+
+.allocation-confirmed {
+  display: block;
+
+  margin-top: 8px;
+
+  color: rgba(255,255,255,.75);
+
+  font-size: 11px;
+}
+
+
+.allocation-hero-room strong {
+  font-size: clamp(24px, 4vw, 34px);
+  line-height: 1;
+}
+
+
+.allocation-hero-room > span:last-child {
+  margin-top: 7px;
+
+  color: rgba(255,255,255,.72);
+
+  font-size: 11px;
+}
+
+
+/* SECTION TITLES */
+
+.allocation-section-title {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+
+  margin-top: 30px;
+  margin-bottom: 12px;
+}
+
+
+.allocation-section-icon {
+  width: 34px;
+  height: 34px;
+
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  flex: 0 0 34px;
+
+  border-radius: 10px;
+
+  background: #e9f7ef;
+
+  color: #075b3a;
+
+  font-size: 14px;
+  font-weight: 800;
+}
+
+
+.allocation-section-title strong,
+.allocation-section-title span {
+  display: block;
+}
+
+
+.allocation-section-title strong {
+  color: #10251c;
+
+  font-size: 13px;
+}
+
+
+.allocation-section-title span {
+  margin-top: 2px;
+
+  color: #718078;
+
+  font-size: 10px;
+}
+
+
+/* ROOM GRID */
+
+.allocation-room-grid {
+  display: grid;
+
+  grid-template-columns:
+    repeat(4, 1fr);
+
+  overflow: hidden;
+
+  border: 1px solid #d8e4dd;
+  border-radius: 15px;
+
+  background: #ffffff;
+}
+
+
+.allocation-room-item {
+  padding: 18px;
+
+  border-right: 1px solid #d8e4dd;
+}
+
+
+.allocation-room-item:last-child {
+  border-right: 0;
+}
+
+
+.allocation-room-item span,
+.allocation-student-grid span,
+.allocation-record span {
+  display: block;
+
+  color: #738179;
+
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: .08em;
+
+  text-transform: uppercase;
+}
+
+
+.allocation-room-item strong {
+  display: block;
+
+  margin-top: 6px;
+
+  color: #10251c;
+
+  font-size: 19px;
+}
+
+
+.allocation-room-item.primary strong {
+  color: #075b3a;
+}
+
+
+.allocation-room-item.highlight {
+  background: #f1fad9;
+}
+
+
+.allocation-room-item.highlight strong {
+  color: #075b3a;
+}
+
+
+/* STUDENT GRID */
+
+.allocation-student-grid {
+  display: grid;
+
+  grid-template-columns:
+    repeat(2, 1fr);
+
+  overflow: hidden;
+
+  border: 1px solid #d8e4dd;
+  border-radius: 15px;
+
+  background: #ffffff;
+}
+
+
+.allocation-student-grid > div {
+  padding: 17px 18px;
+
+  border-bottom: 1px solid #d8e4dd;
+}
+
+
+.allocation-student-grid > div:nth-child(odd) {
+  border-right: 1px solid #d8e4dd;
+}
+
+
+.allocation-student-grid > div:nth-last-child(-n + 2) {
+  border-bottom: 0;
+}
+
+
+.allocation-student-grid strong {
+  display: block;
+
+  margin-top: 5px;
+
+  overflow-wrap: anywhere;
+
+  color: #10251c;
+
+  font-size: 12px;
+}
+
+
+/* RECORD */
+
+.allocation-record {
+  display: grid;
+
+  grid-template-columns:
+    1fr 1fr;
+
+  gap: 12px;
+
+  margin-top: 14px;
+}
+
+
+.allocation-record > div {
+  padding: 16px 18px;
+
+  border: 1px solid #d8e4dd;
+  border-radius: 14px;
+
+  background: #f8faf9;
+}
+
+
+.allocation-record strong {
+  display: block;
+
+  margin-top: 5px;
+
+  color: #10251c;
+
+  font-size: 11px;
+}
+
+
+.allocation-record .record-status {
+  color: #087443;
+}
+
+
+/* ACTIONS */
+
+.allocation-actions {
+  display: flex;
+
+  justify-content: flex-end;
+
+  gap: 10px;
+
+  margin-top: 25px;
+}
+
+
+.allocation-print-button {
+  min-width: 220px;
+}
+
+
+.allocation-print-note {
+  margin: 10px 0 0;
+
+  color: #7a8982;
+
+  font-size: 10px;
+
+  text-align: right;
+}
+
+
+/* MOBILE */
+
+@media (max-width: 700px) {
+
+  .allocation-details-heading {
+    flex-direction: column;
+    gap: 12px;
+  }
+
+
+  .allocation-status-badge {
+    align-self: flex-start;
+  }
+
+
+  .allocation-hero {
+    grid-template-columns: 1fr;
+  }
+
+
+  .allocation-hero-room {
+    border-left: 0;
+    border-top: 1px solid rgba(255,255,255,.14);
+  }
+
+
+  .allocation-room-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+
+  .allocation-room-item:nth-child(2) {
+    border-right: 0;
+  }
+
+
+  .allocation-room-item:nth-child(-n + 2) {
+    border-bottom: 1px solid #d8e4dd;
+  }
+
+
+  .allocation-student-grid {
+    grid-template-columns: 1fr;
+  }
+
+
+  .allocation-student-grid > div:nth-child(odd) {
+    border-right: 0;
+  }
+
+
+  .allocation-student-grid > div:last-child {
+    border-bottom: 0;
+  }
+
+
+  .allocation-record {
+    grid-template-columns: 1fr;
+  }
+
+
+  .allocation-actions {
+    flex-direction: column;
+  }
+
+
+  .allocation-print-button {
+    width: 100%;
+  }
+
+
+  .allocation-print-note {
+    text-align: center;
+  }
+
+}
+
+
+@media (max-width: 420px) {
+
+  .allocation-hero-main,
+  .allocation-hero-room {
+    padding: 22px;
+  }
+
+
+  .allocation-room-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+
+
+  .allocation-room-item {
+    padding: 14px;
+  }
+
+
+  .allocation-room-item strong {
+    font-size: 16px;
+  }
+
+}

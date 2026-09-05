@@ -805,7 +805,10 @@ function showAllocationReceipt(data) {
   `;
 
   if (roomsSection) roomsSection.hidden = true;
-  document.getElementById('printAllocation')?.addEventListener('click', () => window.print());
+  document.getElementById('printAllocation')?.addEventListener(
+  'click',
+  printStudentAllocation
+);
   document.getElementById('openStudentPortal')?.addEventListener('click', async () => {
     const loaded = await loadStudentPortal();
     if (!loaded) showMessage('Unable to load student portal. Please refresh the page.', 'error');
@@ -877,7 +880,10 @@ function renderStudentPortal() {
   });
 
   document.getElementById('studentLogout')?.addEventListener('click', logoutStudent);
-  document.getElementById('printStudentAllocation')?.addEventListener('click', () => window.print());
+  document.getElementById('printStudentAllocation')?.addEventListener(
+  'click',
+  printStudentAllocation
+);
 }
 
 function renderPortalTab() {
@@ -962,41 +968,1243 @@ function renderRoommatesTab() {
 }
 
 function renderAllocationDetailsTab() {
+
   const allocation = currentAllocation;
   const bed = allocation?.beds;
   const room = bed?.rooms;
-  const createdAt = allocation?.created_at ? new Date(allocation.created_at).toLocaleString() : '—';
+
+  const createdAt = allocation?.created_at
+    ? new Date(allocation.created_at).toLocaleString('en-GB', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      })
+    : '—';
+
+  const studentName =
+    currentStudent?.student_name || '—';
+
+  const studentId =
+    currentStudent?.student_id || '—';
+
+  const programme =
+    currentStudent?.programme || '—';
+
+  const level =
+    currentStudent?.level ?? '—';
+
+  const gender =
+    currentStudent?.gender || '—';
+
+  const phone =
+    currentStudent?.phone_number || '—';
+
+  const allocationNumber =
+    allocation?.allocation_number || '—';
+
+  const status =
+    allocation?.status || 'CONFIRMED';
 
   return `
-    <section class="portal-panel">
-      <div class="portal-panel-heading">
-        <span class="eyebrow">CONFIRMED ALLOCATION</span>
-        <h3>Allocation Details</h3>
-        <p>Your official accommodation assignment.</p>
+    <section class="portal-panel allocation-details-panel">
+
+      <div class="portal-panel-heading allocation-details-heading">
+
+        <div>
+          <span class="eyebrow">
+            OFFICIAL ACCOMMODATION RECORD
+          </span>
+
+          <h3>
+            Allocation Details
+          </h3>
+
+          <p>
+            Your confirmed UHAS Asogli Hall accommodation assignment.
+          </p>
+        </div>
+
+        <span class="allocation-status-badge">
+          <span class="status-dot"></span>
+          ${escapeHtml(status)}
+        </span>
+
       </div>
-      <div class="allocation-ticket portal-ticket">
-        <div class="ticket-header">
-          <div><span>ALLOCATION NUMBER</span><strong>${escapeHtml(allocation?.allocation_number || '—')}</strong></div>
-          <span class="ticket-confirmed">${escapeHtml(allocation?.status || 'CONFIRMED').toUpperCase()}</span>
+
+
+      <!-- ALLOCATION HERO -->
+
+      <div class="allocation-hero">
+
+        <div class="allocation-hero-main">
+
+          <span class="allocation-hero-label">
+            ALLOCATION NUMBER
+          </span>
+
+          <strong class="allocation-number">
+            ${escapeHtml(allocationNumber)}
+          </strong>
+
+          <span class="allocation-confirmed">
+            Accommodation confirmed
+          </span>
+
         </div>
-        <div class="ticket-student">
-          <span>STUDENT</span>
-          <strong>${escapeHtml(currentStudent?.student_name || '—')}</strong>
+
+        <div class="allocation-hero-room">
+
+          <span class="allocation-hero-label">
+            ROOM
+          </span>
+
+          <strong>
+            ${escapeHtml(room?.room_code || '—')}
+          </strong>
+
+          <span>
+            ${escapeHtml(room?.block || '—')} Block
+          </span>
+
         </div>
-        <div class="ticket-grid">
-          <div><span>BLOCK</span><strong>${escapeHtml(room?.block || '—')}</strong></div>
-          <div><span>ROOM</span><strong>${escapeHtml(room?.room_number ?? '—')}</strong></div>
-          <div><span>BED</span><strong>${escapeHtml(bed?.bed_number ?? '—')}</strong></div>
-          <div><span>ROOM CODE</span><strong>${escapeHtml(room?.room_code || '—')}</strong></div>
+
+      </div>
+
+
+      <!-- ROOM ASSIGNMENT -->
+
+      <div class="allocation-section-title">
+
+        <span class="allocation-section-icon">
+          ⌂
+        </span>
+
+        <div>
+          <strong>
+            Accommodation Assignment
+          </strong>
+
+          <span>
+            Your assigned location within Asogli Hall
+          </span>
         </div>
-        <div class="allocation-created">
+
+      </div>
+
+
+      <div class="allocation-room-grid">
+
+        <div class="allocation-room-item primary">
+
+          <span>BLOCK</span>
+
+          <strong>
+            ${escapeHtml(room?.block || '—')}
+          </strong>
+
+        </div>
+
+
+        <div class="allocation-room-item primary">
+
+          <span>ROOM</span>
+
+          <strong>
+            ${escapeHtml(room?.room_number ?? '—')}
+          </strong>
+
+        </div>
+
+
+        <div class="allocation-room-item highlight">
+
+          <span>ASSIGNED BED</span>
+
+          <strong>
+            Bed ${escapeHtml(bed?.bed_number ?? '—')}
+          </strong>
+
+        </div>
+
+
+        <div class="allocation-room-item">
+
+          <span>FLOOR</span>
+
+          <strong>
+            ${escapeHtml(room?.floor ?? '—')}
+          </strong>
+
+        </div>
+
+      </div>
+
+
+      <!-- STUDENT INFORMATION -->
+
+      <div class="allocation-section-title">
+
+        <span class="allocation-section-icon">
+          ◉
+        </span>
+
+        <div>
+          <strong>
+            Student Information
+          </strong>
+
+          <span>
+            Details associated with this allocation
+          </span>
+        </div>
+
+      </div>
+
+
+      <div class="allocation-student-grid">
+
+        <div>
+          <span>STUDENT NAME</span>
+          <strong>
+            ${escapeHtml(studentName)}
+          </strong>
+        </div>
+
+        <div>
+          <span>INDEX NUMBER</span>
+          <strong>
+            ${escapeHtml(studentId)}
+          </strong>
+        </div>
+
+        <div>
+          <span>PROGRAMME</span>
+          <strong>
+            ${escapeHtml(programme)}
+          </strong>
+        </div>
+
+        <div>
+          <span>LEVEL</span>
+          <strong>
+            ${escapeHtml(level)}
+          </strong>
+        </div>
+
+        <div>
+          <span>GENDER</span>
+          <strong>
+            ${escapeHtml(gender)}
+          </strong>
+        </div>
+
+        <div>
+          <span>PHONE NUMBER</span>
+          <strong>
+            ${escapeHtml(phone)}
+          </strong>
+        </div>
+
+      </div>
+
+
+      <!-- RECORD INFORMATION -->
+
+      <div class="allocation-record">
+
+        <div>
           <span>ALLOCATION DATE</span>
-          <strong>${escapeHtml(createdAt)}</strong>
+          <strong>
+            ${escapeHtml(createdAt)}
+          </strong>
         </div>
+
+        <div>
+          <span>STATUS</span>
+          <strong class="record-status">
+            ${escapeHtml(status)}
+          </strong>
+        </div>
+
       </div>
-      <button type="button" class="primary-action" id="printStudentAllocation">Print / Save allocation <span aria-hidden="true">↗</span></button>
+
+
+      <!-- ACTIONS -->
+
+      <div class="allocation-actions">
+
+        <button
+          type="button"
+          class="primary-action allocation-print-button"
+          id="printStudentAllocation"
+        >
+          <span aria-hidden="true">▣</span>
+          Print / Save Allocation
+        </button>
+
+      </div>
+
+
+      <p class="allocation-print-note">
+        Your allocation record can be printed or saved as a PDF
+        for your records.
+      </p>
+
     </section>
   `;
+}
+
+function printStudentAllocation() {
+
+  const allocation = currentAllocation;
+  const bed = allocation?.beds;
+  const room = bed?.rooms;
+
+  if (!allocation || !currentStudent) {
+    alert('Your allocation details are not available.');
+    return;
+  }
+
+  const studentName =
+    currentStudent.student_name || '—';
+
+  const studentId =
+    currentStudent.student_id || '—';
+
+  const programme =
+    currentStudent.programme || '—';
+
+  const level =
+    currentStudent.level ?? '—';
+
+  const gender =
+    currentStudent.gender || '—';
+
+  const phone =
+    currentStudent.phone_number || '—';
+
+  const allocationNumber =
+    allocation.allocation_number || '—';
+
+  const status =
+    allocation.status || 'CONFIRMED';
+
+  const createdAt =
+    allocation.created_at
+      ? new Date(allocation.created_at).toLocaleString('en-GB', {
+          day: '2-digit',
+          month: 'long',
+          year: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit'
+        })
+      : '—';
+
+
+  const printWindow = window.open(
+    '',
+    '_blank',
+    'width=900,height=1100'
+  );
+
+  if (!printWindow) {
+
+    alert(
+      'The print window was blocked by your browser. Please allow pop-ups and try again.'
+    );
+
+    return;
+  }
+
+
+  printWindow.document.open();
+
+  printWindow.document.write(`
+    <!doctype html>
+
+    <html lang="en">
+
+    <head>
+
+      <meta charset="utf-8">
+
+      <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1"
+      >
+
+      <title>
+        UHAS Asogli Hall Allocation - ${escapeHtml(studentId)}
+      </title>
+
+      <style>
+
+        @page {
+          size: A4;
+          margin: 14mm 15mm 16mm 15mm;
+        }
+
+
+        * {
+          box-sizing: border-box;
+        }
+
+
+        html,
+        body {
+          margin: 0;
+          padding: 0;
+          background: #ffffff;
+          color: #10251c;
+          font-family:
+            Arial,
+            Helvetica,
+            sans-serif;
+          -webkit-print-color-adjust: exact;
+          print-color-adjust: exact;
+        }
+
+
+        body {
+          font-size: 12px;
+          line-height: 1.5;
+        }
+
+
+        .document {
+          width: 100%;
+          max-width: 780px;
+          margin: 0 auto;
+        }
+
+
+        /* HEADER */
+
+        .header {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 20px;
+
+          padding-bottom: 18px;
+
+          border-bottom: 3px solid #075b3a;
+        }
+
+
+        .brand {
+          display: flex;
+          align-items: center;
+          gap: 13px;
+        }
+
+
+        .brand-mark {
+          width: 48px;
+          height: 48px;
+
+          display: flex;
+          align-items: center;
+          justify-content: center;
+
+          border-radius: 12px;
+
+          background: #075b3a;
+          color: #ffffff;
+
+          font-size: 13px;
+          font-weight: 800;
+          letter-spacing: .04em;
+        }
+
+
+        .institution {
+          font-size: 13px;
+          font-weight: 800;
+          letter-spacing: .08em;
+          color: #075b3a;
+          text-transform: uppercase;
+        }
+
+
+        .hall {
+          margin-top: 2px;
+
+          font-size: 19px;
+          font-weight: 800;
+          color: #10251c;
+        }
+
+
+        .document-label {
+          text-align: right;
+        }
+
+
+        .document-label span {
+          display: block;
+
+          font-size: 9px;
+          font-weight: 700;
+          letter-spacing: .12em;
+          color: #63766d;
+          text-transform: uppercase;
+        }
+
+
+        .document-label strong {
+          display: block;
+
+          margin-top: 3px;
+
+          font-size: 12px;
+          color: #075b3a;
+        }
+
+
+        /* TITLE */
+
+        .title-area {
+          padding: 25px 0 20px;
+        }
+
+
+        .title-area h1 {
+          margin: 0;
+
+          font-size: 25px;
+          line-height: 1.15;
+
+          color: #075b3a;
+        }
+
+
+        .title-area p {
+          margin: 7px 0 0;
+
+          color: #5c6d65;
+          font-size: 11px;
+        }
+
+
+        /* ALLOCATION NUMBER */
+
+        .allocation-banner {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+
+          gap: 20px;
+
+          padding: 18px 20px;
+
+          background: #075b3a;
+          color: #ffffff;
+
+          border-radius: 10px;
+
+          margin-bottom: 22px;
+        }
+
+
+        .allocation-banner-label {
+          display: block;
+
+          font-size: 8px;
+          font-weight: 700;
+          letter-spacing: .14em;
+
+          opacity: .78;
+        }
+
+
+        .allocation-number {
+          display: block;
+
+          margin-top: 3px;
+
+          font-size: 22px;
+          font-weight: 800;
+          letter-spacing: .02em;
+        }
+
+
+        .confirmed {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+
+          padding: 7px 11px;
+
+          border-radius: 999px;
+
+          background: rgba(255,255,255,.14);
+
+          font-size: 9px;
+          font-weight: 800;
+          letter-spacing: .08em;
+        }
+
+
+        .confirmed::before {
+          content: "";
+          width: 7px;
+          height: 7px;
+          border-radius: 50%;
+          background: #c9f45b;
+        }
+
+
+        /* SECTIONS */
+
+        .section {
+          margin-bottom: 22px;
+          break-inside: avoid;
+        }
+
+
+        .section-heading {
+          display: flex;
+          align-items: center;
+          gap: 9px;
+
+          padding-bottom: 8px;
+
+          border-bottom: 1px solid #d9e3de;
+
+          margin-bottom: 11px;
+        }
+
+
+        .section-heading strong {
+          font-size: 12px;
+          color: #075b3a;
+        }
+
+
+        .section-heading span {
+          display: block;
+
+          margin-top: 1px;
+
+          font-size: 9px;
+          color: #718179;
+        }
+
+
+        .section-icon {
+          width: 27px;
+          height: 27px;
+
+          display: flex;
+          align-items: center;
+          justify-content: center;
+
+          border-radius: 7px;
+
+          background: #e9f6ef;
+          color: #075b3a;
+
+          font-weight: 800;
+        }
+
+
+        /* ROOM DETAILS */
+
+        .room-grid {
+          display: grid;
+          grid-template-columns:
+            repeat(4, 1fr);
+
+          border: 1px solid #d9e3de;
+          border-radius: 9px;
+
+          overflow: hidden;
+        }
+
+
+        .room-item {
+          padding: 13px 14px;
+
+          border-right: 1px solid #d9e3de;
+          background: #f8faf9;
+        }
+
+
+        .room-item:last-child {
+          border-right: 0;
+        }
+
+
+        .room-item span,
+        .student-item span,
+        .record-item span {
+          display: block;
+
+          font-size: 8px;
+          font-weight: 700;
+          letter-spacing: .09em;
+
+          color: #728078;
+          text-transform: uppercase;
+        }
+
+
+        .room-item strong {
+          display: block;
+
+          margin-top: 4px;
+
+          font-size: 15px;
+          color: #10251c;
+        }
+
+
+        .room-item.highlight {
+          background: #effbd0;
+        }
+
+
+        .room-item.highlight strong {
+          color: #075b3a;
+        }
+
+
+        /* STUDENT */
+
+        .student-grid {
+          display: grid;
+
+          grid-template-columns:
+            repeat(2, 1fr);
+
+          border: 1px solid #d9e3de;
+          border-radius: 9px;
+
+          overflow: hidden;
+        }
+
+
+        .student-item {
+          padding: 12px 14px;
+
+          border-bottom: 1px solid #d9e3de;
+        }
+
+
+        .student-item:nth-child(odd) {
+          border-right: 1px solid #d9e3de;
+        }
+
+
+        .student-item:nth-last-child(-n+2) {
+          border-bottom: 0;
+        }
+
+
+        .student-item strong {
+          display: block;
+
+          margin-top: 4px;
+
+          font-size: 11px;
+          color: #10251c;
+        }
+
+
+        /* RECORD */
+
+        .record {
+          display: grid;
+
+          grid-template-columns: 1fr 1fr;
+
+          gap: 12px;
+        }
+
+
+        .record-item {
+          padding: 13px 14px;
+
+          border: 1px solid #d9e3de;
+
+          border-radius: 8px;
+        }
+
+
+        .record-item strong {
+          display: block;
+
+          margin-top: 4px;
+
+          font-size: 10px;
+        }
+
+
+        .record-status {
+          color: #087443;
+          text-transform: uppercase;
+        }
+
+
+        /* FOOTER */
+
+        .footer {
+          margin-top: 28px;
+          padding-top: 13px;
+
+          border-top: 1px solid #d9e3de;
+
+          display: flex;
+          justify-content: space-between;
+          gap: 20px;
+
+          color: #738078;
+          font-size: 8px;
+        }
+
+
+        .footer strong {
+          color: #075b3a;
+        }
+
+
+        .notice {
+          margin-top: 18px;
+
+          padding: 10px 12px;
+
+          border-left: 3px solid #b7e33f;
+
+          background: #f6f9f5;
+
+          color: #52625a;
+
+          font-size: 9px;
+        }
+
+
+        @media print {
+
+          body {
+            background: #ffffff;
+          }
+
+          .document {
+            max-width: none;
+          }
+
+        }
+
+      </style>
+
+    </head>
+
+
+    <body>
+
+      <main class="document">
+
+
+        <!-- HEADER -->
+
+        <header class="header">
+
+          <div class="brand">
+
+            <div class="brand-mark">
+              UHAS
+            </div>
+
+            <div>
+
+              <div class="institution">
+                University of Health and Allied Sciences
+              </div>
+
+              <div class="hall">
+                Asogli Hall
+              </div>
+
+            </div>
+
+          </div>
+
+
+          <div class="document-label">
+
+            <span>
+              Accommodation Record
+            </span>
+
+            <strong>
+              Official Student Copy
+            </strong>
+
+          </div>
+
+        </header>
+
+
+        <!-- TITLE -->
+
+        <section class="title-area">
+
+          <h1>
+            Room Allocation
+          </h1>
+
+          <p>
+            Student accommodation allocation record
+          </p>
+
+        </section>
+
+
+        <!-- ALLOCATION NUMBER -->
+
+        <section class="allocation-banner">
+
+          <div>
+
+            <span class="allocation-banner-label">
+              ALLOCATION NUMBER
+            </span>
+
+            <strong class="allocation-number">
+              ${escapeHtml(allocationNumber)}
+            </strong>
+
+          </div>
+
+
+          <div class="confirmed">
+            ${escapeHtml(status)}
+          </div>
+
+        </section>
+
+
+        <!-- ROOM -->
+
+        <section class="section">
+
+          <div class="section-heading">
+
+            <div class="section-icon">
+              ⌂
+            </div>
+
+            <div>
+
+              <strong>
+                Accommodation Assignment
+              </strong>
+
+              <span>
+                Assigned location within Asogli Hall
+              </span>
+
+            </div>
+
+          </div>
+
+
+          <div class="room-grid">
+
+            <div class="room-item">
+
+              <span>
+                Block
+              </span>
+
+              <strong>
+                ${escapeHtml(room?.block || '—')}
+              </strong>
+
+            </div>
+
+
+            <div class="room-item">
+
+              <span>
+                Room
+              </span>
+
+              <strong>
+                ${escapeHtml(room?.room_number ?? '—')}
+              </strong>
+
+            </div>
+
+
+            <div class="room-item highlight">
+
+              <span>
+                Assigned Bed
+              </span>
+
+              <strong>
+                Bed ${escapeHtml(bed?.bed_number ?? '—')}
+              </strong>
+
+            </div>
+
+
+            <div class="room-item">
+
+              <span>
+                Floor
+              </span>
+
+              <strong>
+                ${escapeHtml(room?.floor ?? '—')}
+              </strong>
+
+            </div>
+
+          </div>
+
+        </section>
+
+
+        <!-- STUDENT -->
+
+        <section class="section">
+
+          <div class="section-heading">
+
+            <div class="section-icon">
+              ◉
+            </div>
+
+            <div>
+
+              <strong>
+                Student Information
+              </strong>
+
+              <span>
+                Information associated with this allocation
+              </span>
+
+            </div>
+
+          </div>
+
+
+          <div class="student-grid">
+
+            <div class="student-item">
+
+              <span>
+                Student Name
+              </span>
+
+              <strong>
+                ${escapeHtml(studentName)}
+              </strong>
+
+            </div>
+
+
+            <div class="student-item">
+
+              <span>
+                Index Number
+              </span>
+
+              <strong>
+                ${escapeHtml(studentId)}
+              </strong>
+
+            </div>
+
+
+            <div class="student-item">
+
+              <span>
+                Programme
+              </span>
+
+              <strong>
+                ${escapeHtml(programme)}
+              </strong>
+
+            </div>
+
+
+            <div class="student-item">
+
+              <span>
+                Level
+              </span>
+
+              <strong>
+                ${escapeHtml(level)}
+              </strong>
+
+            </div>
+
+
+            <div class="student-item">
+
+              <span>
+                Gender
+              </span>
+
+              <strong>
+                ${escapeHtml(gender)}
+              </strong>
+
+            </div>
+
+
+            <div class="student-item">
+
+              <span>
+                Phone Number
+              </span>
+
+              <strong>
+                ${escapeHtml(phone)}
+              </strong>
+
+            </div>
+
+          </div>
+
+        </section>
+
+
+        <!-- RECORD -->
+
+        <section class="section">
+
+          <div class="section-heading">
+
+            <div class="section-icon">
+              ✓
+            </div>
+
+            <div>
+
+              <strong>
+                Allocation Record
+              </strong>
+
+              <span>
+                Confirmation information
+              </span>
+
+            </div>
+
+          </div>
+
+
+          <div class="record">
+
+            <div class="record-item">
+
+              <span>
+                Allocation Date
+              </span>
+
+              <strong>
+                ${escapeHtml(createdAt)}
+              </strong>
+
+            </div>
+
+
+            <div class="record-item">
+
+              <span>
+                Status
+              </span>
+
+              <strong class="record-status">
+                ${escapeHtml(status)}
+              </strong>
+
+            </div>
+
+          </div>
+
+        </section>
+
+
+        <div class="notice">
+
+          <strong>
+            Important:
+          </strong>
+
+          This document confirms the accommodation assignment
+          recorded for the student in the UHAS Asogli Hall
+          accommodation system. Students should retain this
+          document for their records.
+
+        </div>
+
+
+        <!-- FOOTER -->
+
+        <footer class="footer">
+
+          <div>
+            UHAS Asogli Hall Accommodation Portal
+          </div>
+
+          <div>
+            <strong>
+              Official Student Copy
+            </strong>
+          </div>
+
+        </footer>
+
+
+      </main>
+
+
+      <script>
+
+        window.addEventListener(
+          'load',
+          function () {
+
+            setTimeout(
+              function () {
+
+                window.print();
+
+              },
+              250
+            );
+
+          }
+        );
+
+        window.addEventListener(
+          'afterprint',
+          function () {
+
+            window.close();
+
+          }
+        );
+
+      <\/script>
+
+    </body>
+
+    </html>
+  `);
+
+  printWindow.document.close();
 }
 
 async function logoutStudent() {
