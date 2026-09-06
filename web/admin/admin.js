@@ -15,6 +15,7 @@ let currentUser = null;
 let currentProfile = null;
 
 let isInitialising = false;
+let authStateInitialised = false;
 let applicationInitialised = false;
 
 let searchTimer = null;
@@ -27,10 +28,13 @@ let adminManagementInitialised = false;
    DOM HELPERS
    ========================================================= */
 
-const $ = (selector) => document.querySelector(selector);
+const $ = (selector) =>
+    document.querySelector(selector);
 
 const $$ = (selector) =>
-    Array.from(document.querySelectorAll(selector));
+    Array.from(
+        document.querySelectorAll(selector)
+    );
 
 
 function setText(selector, value) {
@@ -41,7 +45,8 @@ function setText(selector, value) {
     }
 
     element.textContent =
-        value === null || value === undefined
+        value === null ||
+        value === undefined
             ? ""
             : String(value);
 }
@@ -99,10 +104,13 @@ function formatDate(value) {
         return String(value);
     }
 
-    return date.toLocaleString("en-GH", {
-        dateStyle: "medium",
-        timeStyle: "short"
-    });
+    return date.toLocaleString(
+        "en-GH",
+        {
+            dateStyle: "medium",
+            timeStyle: "short"
+        }
+    );
 }
 
 
@@ -117,11 +125,14 @@ function formatDateOnly(value) {
         return String(value);
     }
 
-    return date.toLocaleDateString("en-GH", {
-        year: "numeric",
-        month: "short",
-        day: "numeric"
-    });
+    return date.toLocaleDateString(
+        "en-GH",
+        {
+            year: "numeric",
+            month: "short",
+            day: "numeric"
+        }
+    );
 }
 
 
@@ -158,7 +169,8 @@ function showToast(
         return;
     }
 
-    toast.textContent = message;
+    toast.textContent =
+        message || "";
 
     toast.className =
         `toast ${type}`;
@@ -170,9 +182,14 @@ function showToast(
     );
 
     showToast.timer =
-        window.setTimeout(() => {
-            toast.classList.remove("show");
-        }, 3500);
+        window.setTimeout(
+            () => {
+                toast.classList.remove(
+                    "show"
+                );
+            },
+            3500
+        );
 }
 
 
@@ -202,7 +219,8 @@ function setButtonLoading(
         }
 
         button.disabled = true;
-        button.textContent = loadingText;
+        button.textContent =
+            loadingText;
 
         return;
     }
@@ -227,7 +245,8 @@ async function getCurrentSession() {
         const {
             data,
             error
-        } = await supabase.auth.getSession();
+        } =
+            await supabase.auth.getSession();
 
         if (error) {
             console.error(
@@ -239,6 +258,7 @@ async function getCurrentSession() {
         }
 
         return data?.session || null;
+
     } catch (error) {
         console.error(
             "Session error:",
@@ -252,11 +272,14 @@ async function getCurrentSession() {
 
 /*
  * IMPORTANT:
- * The profiles table in the current database does NOT expose
- * auth_user_id.
  *
- * Therefore this function deliberately uses profiles.id first.
- * It also safely falls back to metadata if no profile exists.
+ * The current database profiles table does NOT expose
+ * auth_user_id according to the existing application logic.
+ *
+ * Therefore profiles.id is checked against the authenticated
+ * user's UUID.
+ *
+ * Failure to retrieve a profile must NOT destroy the portal.
  */
 async function loadCurrentProfile() {
     currentProfile = null;
@@ -269,17 +292,17 @@ async function loadCurrentProfile() {
         const {
             data,
             error
-        } = await supabase
-            .from("profiles")
-            .select("*")
-            .eq("id", currentUser.id)
-            .maybeSingle();
+        } =
+            await supabase
+                .from("profiles")
+                .select("*")
+                .eq(
+                    "id",
+                    currentUser.id
+                )
+                .maybeSingle();
 
         if (error) {
-            /*
-             * Do not crash the entire admin portal because
-             * the profile lookup failed.
-             */
             console.warn(
                 "Admin profile lookup failed:",
                 error
@@ -294,6 +317,7 @@ async function loadCurrentProfile() {
             data || null;
 
         return currentProfile;
+
     } catch (error) {
         console.warn(
             "Unable to load admin profile:",
@@ -341,7 +365,9 @@ function getUserRole() {
 
 function isSuperAdmin() {
     const role =
-        normalise(getUserRole());
+        normalise(
+            getUserRole()
+        );
 
     if (
         role === "super_admin" ||
@@ -352,8 +378,8 @@ function isSuperAdmin() {
     }
 
     /*
-     * Also inspect displayed role if the backend does not
-     * expose the profile role.
+     * Some existing database/backend configurations may
+     * expose the role through the UI instead of the profile.
      */
     const roleElements = [
         "#adminRole",
@@ -363,7 +389,8 @@ function isSuperAdmin() {
 
     return roleElements.some(
         (selector) => {
-            const element = $(selector);
+            const element =
+                $(selector);
 
             if (!element) {
                 return false;
@@ -377,8 +404,12 @@ function isSuperAdmin() {
             return (
                 text === "super_admin" ||
                 text === "superadmin" ||
-                text.includes("super_admin") ||
-                text.includes("super admin")
+                text.includes(
+                    "super_admin"
+                ) ||
+                text.includes(
+                    "super admin"
+                )
             );
         }
     );
@@ -387,11 +418,14 @@ function isSuperAdmin() {
 
 function updateRoleDisplay() {
     const role =
-        normalise(getUserRole());
+        normalise(
+            getUserRole()
+        );
 
     const superAdmin =
         role === "super_admin" ||
         role === "superadmin" ||
+        role === "super_admin_role" ||
         isSuperAdmin();
 
     const displayRole =
@@ -422,22 +456,27 @@ function updateRoleDisplay() {
 
     if (superAdmin) {
         if (managementNav) {
-            managementNav.style.display = "";
-            managementNav.hidden = false;
+            managementNav.style.display =
+                "";
+
+            managementNav.hidden =
+                false;
         }
     } else {
         if (managementNav) {
             managementNav.style.display =
                 "none";
 
-            managementNav.hidden = true;
+            managementNav.hidden =
+                true;
         }
 
         if (managementSection) {
             managementSection.style.display =
                 "none";
 
-            managementSection.hidden = true;
+            managementSection.hidden =
+                true;
         }
     }
 }
@@ -463,7 +502,8 @@ async function handleLogin(event) {
         $("#loginError");
 
     if (errorElement) {
-        errorElement.textContent = "";
+        errorElement.textContent =
+            "";
     }
 
     if (!email || !password) {
@@ -485,10 +525,12 @@ async function handleLogin(event) {
         const {
             data,
             error
-        } = await supabase.auth.signInWithPassword({
-            email,
-            password
-        });
+        } =
+            await supabase.auth
+                .signInWithPassword({
+                    email,
+                    password
+                });
 
         if (error) {
             throw error;
@@ -497,15 +539,50 @@ async function handleLogin(event) {
         currentUser =
             data?.user || null;
 
+        if (!currentUser) {
+            throw new Error(
+                "Login succeeded but no authenticated user was returned."
+            );
+        }
+
+        /*
+         * Mark the login as being handled here.
+         *
+         * This prevents the simultaneous Supabase auth event
+         * from starting a second complete initialization.
+         */
+        authStateInitialised = true;
+        applicationInitialised = true;
+
         await loadCurrentProfile();
 
         showApp();
 
         updateRoleDisplay();
 
-        await initialiseAdminManagement();
+        /*
+         * Administrator management is optional.
+         */
+        try {
+            await initialiseAdminManagement();
+        } catch (error) {
+            console.error(
+                "Admin management initialisation failed:",
+                error
+            );
+        }
 
-        await loadEverything();
+        /*
+         * Main dashboard data.
+         */
+        try {
+            await loadEverything();
+        } catch (error) {
+            console.error(
+                "Dashboard loading failed:",
+                error
+            );
+        }
 
         activateSection(
             "dashboardSection"
@@ -514,17 +591,30 @@ async function handleLogin(event) {
         showToast(
             "Login successful."
         );
+
     } catch (error) {
         console.error(
             "Login error:",
             error
         );
 
+        /*
+         * A failed login must always return to the login
+         * interface rather than leaving the interface half-loaded.
+         */
+        currentUser = null;
+        currentProfile = null;
+        authStateInitialised = false;
+        applicationInitialised = false;
+
+        showLogin();
+
         if (errorElement) {
             errorElement.textContent =
                 error?.message ||
                 "Unable to sign in.";
         }
+
     } finally {
         setButtonLoading(
             button,
@@ -537,6 +627,7 @@ async function handleLogin(event) {
 async function handleLogout() {
     try {
         await supabase.auth.signOut();
+
     } catch (error) {
         console.error(
             "Logout error:",
@@ -546,6 +637,10 @@ async function handleLogout() {
 
     currentUser = null;
     currentProfile = null;
+
+    authStateInitialised = false;
+    applicationInitialised = false;
+    adminManagementInitialised = false;
 
     showLogin();
 }
@@ -559,15 +654,19 @@ function showLogin() {
         $("#appView");
 
     if (loginView) {
-        loginView.style.display = "";
-        loginView.hidden = false;
+        loginView.style.display =
+            "";
+
+        loginView.hidden =
+            false;
     }
 
     if (appView) {
         appView.style.display =
             "none";
 
-        appView.hidden = true;
+        appView.hidden =
+            true;
     }
 }
 
@@ -583,12 +682,16 @@ function showApp() {
         loginView.style.display =
             "none";
 
-        loginView.hidden = true;
+        loginView.hidden =
+            true;
     }
 
     if (appView) {
-        appView.style.display = "";
-        appView.hidden = false;
+        appView.style.display =
+            "";
+
+        appView.hidden =
+            false;
     }
 }
 
@@ -615,13 +718,14 @@ async function handlePasswordReset(event) {
         const {
             error
         } =
-            await supabase.auth.resetPasswordForEmail(
-                email,
-                {
-                    redirectTo:
-                        redirectUrl
-                }
-            );
+            await supabase.auth
+                .resetPasswordForEmail(
+                    email,
+                    {
+                        redirectTo:
+                            redirectUrl
+                    }
+                );
 
         if (error) {
             throw error;
@@ -630,6 +734,7 @@ async function handlePasswordReset(event) {
         showToast(
             "Password reset instructions have been sent to your email."
         );
+
     } catch (error) {
         console.error(
             "Password reset error:",
@@ -638,7 +743,7 @@ async function handlePasswordReset(event) {
 
         showToast(
             error?.message ||
-                "Unable to send password reset email.",
+            "Unable to send password reset email.",
             "error"
         );
     }
@@ -653,25 +758,41 @@ async function callRpc(
     functionName,
     params = {}
 ) {
-    const {
-        data,
-        error
-    } =
-        await supabase.rpc(
-            functionName,
-            params
+    if (!functionName) {
+        throw new Error(
+            "RPC function name is missing."
         );
+    }
 
-    if (error) {
+    try {
+        const {
+            data,
+            error
+        } =
+            await supabase.rpc(
+                functionName,
+                params
+            );
+
+        if (error) {
+            console.error(
+                `RPC ${functionName} failed:`,
+                error
+            );
+
+            throw error;
+        }
+
+        return data;
+
+    } catch (error) {
         console.error(
-            `RPC ${functionName} failed:`,
+            `RPC ${functionName} exception:`,
             error
         );
 
         throw error;
     }
-
-    return data;
 }
 
 
@@ -757,6 +878,7 @@ async function loadDashboard() {
                 new Date()
             )
         );
+
     } catch (error) {
         console.error(
             "Dashboard load error:",
@@ -772,11 +894,12 @@ async function loadDashboard() {
             "#activeAllocations",
             "#unallocatedStudents"
         ].forEach(
-            (selector) =>
+            (selector) => {
                 setText(
                     selector,
                     "—"
-                )
+                );
+            }
         );
 
         setText(
@@ -800,7 +923,8 @@ async function loadRooms() {
     }
 
     const block =
-        $("#blockFilter")?.value || "";
+        $("#blockFilter")?.value ||
+        "";
 
     grid.innerHTML = `
         <div class="loading-state">
@@ -835,8 +959,11 @@ async function loadRooms() {
 
         grid.innerHTML =
             rooms
-                .map(renderRoomCard)
+                .map(
+                    renderRoomCard
+                )
                 .join("");
+
     } catch (error) {
         console.error(
             "Rooms load error:",
@@ -876,14 +1003,21 @@ function renderRoomCard(room) {
         "available";
 
     if (room.temporarily_locked) {
-        status = "locked";
+        status =
+            "locked";
+
     } else if (
         available === 0 &&
         capacity > 0
     ) {
-        status = "full";
-    } else if (occupied > 0) {
-        status = "partial";
+        status =
+            "full";
+
+    } else if (
+        occupied > 0
+    ) {
+        status =
+            "partial";
     }
 
     const gender =
@@ -897,7 +1031,9 @@ function renderRoomCard(room) {
             class="room-card ${escapeHtml(status)}"
             data-room-id="${escapeHtml(room.id || "")}"
         >
+
             <div class="room-card-top">
+
                 <span class="room-code">
                     ${escapeHtml(
                         room.room_code ||
@@ -909,9 +1045,11 @@ function renderRoomCard(room) {
                 <span class="room-status ${escapeHtml(status)}">
                     ${escapeHtml(status)}
                 </span>
+
             </div>
 
             <div class="room-card-body">
+
                 <div class="room-number">
                     ${escapeHtml(
                         room.room_number ||
@@ -921,6 +1059,7 @@ function renderRoomCard(room) {
                 </div>
 
                 <div class="room-meta">
+
                     <span>
                         ${escapeHtml(
                             room.block ||
@@ -935,23 +1074,43 @@ function renderRoomCard(room) {
                             "—"
                         )}
                     </span>
+
                 </div>
 
                 <div class="room-capacity">
-                    <strong>${occupied}</strong>
-                    <span>occupied</span>
 
-                    <strong>${available}</strong>
-                    <span>available</span>
+                    <strong>
+                        ${occupied}
+                    </strong>
 
-                    <strong>${capacity}</strong>
-                    <span>capacity</span>
+                    <span>
+                        occupied
+                    </span>
+
+                    <strong>
+                        ${available}
+                    </strong>
+
+                    <span>
+                        available
+                    </span>
+
+                    <strong>
+                        ${capacity}
+                    </strong>
+
+                    <span>
+                        capacity
+                    </span>
+
                 </div>
 
                 <div class="room-gender">
                     ${escapeHtml(gender)}
                 </div>
+
             </div>
+
         </button>
     `;
 }
@@ -1001,8 +1160,12 @@ async function openRoomModal(roomId) {
         </div>
     `;
 
-    modal.classList.add("open");
-    modal.style.display = "";
+    modal.classList.add(
+        "open"
+    );
+
+    modal.style.display =
+        "";
 
     try {
         const data =
@@ -1048,10 +1211,12 @@ async function openRoomModal(roomId) {
 
         occupantsContainer.innerHTML = `
             <div class="occupants-list">
+
                 ${occupants
                     .map(
                         (student) => `
                             <div class="occupant-row">
+
                                 <div>
                                     <strong>
                                         ${escapeHtml(
@@ -1085,12 +1250,15 @@ async function openRoomModal(roomId) {
                                         "—"
                                     )}
                                 </div>
+
                             </div>
                         `
                     )
                     .join("")}
+
             </div>
         `;
+
     } catch (error) {
         console.error(
             "Room occupants error:",
@@ -1114,8 +1282,12 @@ function closeRoomModal() {
         return;
     }
 
-    modal.classList.remove("open");
-    modal.style.display = "none";
+    modal.classList.remove(
+        "open"
+    );
+
+    modal.style.display =
+        "none";
 }
 
 
@@ -1144,13 +1316,19 @@ async function loadAllocations() {
         "";
 
     let tbody =
-        table.querySelector("tbody");
+        table.querySelector(
+            "tbody"
+        );
 
     if (!tbody) {
         tbody =
-            document.createElement("tbody");
+            document.createElement(
+                "tbody"
+            );
 
-        table.appendChild(tbody);
+        table.appendChild(
+            tbody
+        );
     }
 
     tbody.innerHTML = `
@@ -1168,8 +1346,10 @@ async function loadAllocations() {
                 {
                     p_search:
                         search || null,
+
                     p_block:
                         block || null,
+
                     p_gender:
                         gender || null
                 }
@@ -1198,6 +1378,7 @@ async function loadAllocations() {
                     renderAllocationRow
                 )
                 .join("");
+
     } catch (error) {
         console.error(
             "Allocations load error:",
@@ -1279,6 +1460,7 @@ function renderAllocationRow(
             data-allocation-id="${escapeHtml(allocationId)}"
             data-student-id="${escapeHtml(studentUuid || studentId)}"
         >
+
             <td>
                 ${escapeHtml(
                     allocation.allocation_number ||
@@ -1345,6 +1527,7 @@ function renderAllocationRow(
             </td>
 
             <td>
+
                 <div class="table-actions">
 
                     <button
@@ -1378,7 +1561,9 @@ function renderAllocationRow(
                     }
 
                 </div>
+
             </td>
+
         </tr>
     `;
 }
@@ -1434,7 +1619,8 @@ function buildBedOptions(
                     bedId;
 
                 const block =
-                    bed.block || "";
+                    bed.block ||
+                    "";
 
                 const floor =
                     bed.floor === null ||
@@ -1482,18 +1668,21 @@ async function reassignAllocation(
         return;
     }
 
-    let gender = "";
+    let gender =
+        "";
 
     const row =
         document.querySelector(
             `tr[data-allocation-id="${CSS.escape(
-                allocationId
+                String(allocationId)
             )}"]`
         );
 
     if (row) {
         const cells =
-            row.querySelectorAll("td");
+            row.querySelectorAll(
+                "td"
+            );
 
         if (cells.length >= 5) {
             gender =
@@ -1621,6 +1810,7 @@ async function reassignAllocation(
         );
 
         await loadEverything();
+
     } catch (error) {
         console.error(
             "Reassignment error:",
@@ -1629,7 +1819,7 @@ async function reassignAllocation(
 
         showToast(
             error?.message ||
-                "Unable to reassign the student.",
+            "Unable to reassign the student.",
             "error"
         );
     }
@@ -1684,6 +1874,7 @@ async function unassignAllocation(
         );
 
         await loadEverything();
+
     } catch (error) {
         console.error(
             "Unassign error:",
@@ -1692,7 +1883,7 @@ async function unassignAllocation(
 
         showToast(
             error?.message ||
-                "Unable to unassign the student.",
+            "Unable to unassign the student.",
             "error"
         );
     }
@@ -1703,18 +1894,6 @@ async function unassignAllocation(
    UNALLOCATED TABLE
    ========================================================= */
 
-/*
- * This is deliberately defensive.
- *
- * If the HTML contains:
- *
- * <table id="unallocatedTable"></table>
- *
- * but no tbody, this function creates it automatically.
- *
- * Therefore the JavaScript no longer depends on a manually
- * created #unallocatedTableBody.
- */
 function getUnallocatedTableBody() {
     let tbody =
         $("#unallocatedTableBody");
@@ -1731,16 +1910,23 @@ function getUnallocatedTableBody() {
     }
 
     tbody =
-        table.querySelector("tbody");
+        table.querySelector(
+            "tbody"
+        );
 
     if (!tbody) {
         tbody =
-            document.createElement("tbody");
+            document.createElement(
+                "tbody"
+            );
 
         tbody.id =
             "unallocatedTableBody";
 
-        table.appendChild(tbody);
+        table.appendChild(
+            tbody
+        );
+
     } else {
         tbody.id =
             "unallocatedTableBody";
@@ -1790,8 +1976,8 @@ async function loadUnallocated() {
                 : [];
 
         console.log(
-    `Loaded ${students.length} unallocated students.`
-);
+            `Loaded ${students.length} unallocated students.`
+        );
 
         if (!students.length) {
             tbody.innerHTML = `
@@ -1815,6 +2001,7 @@ async function loadUnallocated() {
                     renderUnallocatedRow
                 )
                 .join("");
+
     } catch (error) {
         console.error(
             "Unallocated students load error:",
@@ -1831,7 +2018,7 @@ async function loadUnallocated() {
 
         showToast(
             error?.message ||
-                "Unable to load unallocated students.",
+            "Unable to load unallocated students.",
             "error"
         );
     }
@@ -1842,13 +2029,7 @@ function renderUnallocatedRow(
     student
 ) {
     /*
-     * IMPORTANT:
-     *
-     * student_uuid / id may be the actual UUID required
-     * by admin_assign_student().
-     *
-     * student_id may instead be the human-readable
-     * matriculation/student number.
+     * Prefer UUIDs for backend assignment.
      */
     const studentUuid =
         student.student_uuid ||
@@ -1908,10 +2089,6 @@ function renderUnallocatedRow(
         student.email ||
         "—";
 
-    /*
-     * Use UUID where available.
-     * If the RPC returns id as the UUID, use it.
-     */
     const assignId =
         studentUuid ||
         student.id ||
@@ -1920,49 +2097,73 @@ function renderUnallocatedRow(
 
     return `
         <tr
-            data-student-id="${escapeHtml(assignId)}"
+            data-student-id="${escapeHtml(
+                rowId
+            )}"
         >
 
             <td>
                 <strong>
-                    ${escapeHtml(studentName)}
+                    ${escapeHtml(
+                        studentName
+                    )}
                 </strong>
             </td>
 
             <td>
-                ${escapeHtml(studentNumber)}
+                ${escapeHtml(
+                    studentNumber
+                )}
             </td>
 
             <td>
-                ${escapeHtml(level)}
+                ${escapeHtml(
+                    level
+                )}
             </td>
 
             <td>
-                ${escapeHtml(programme)}
+                ${escapeHtml(
+                    programme
+                )}
             </td>
 
             <td>
-                ${escapeHtml(gender)}
+                ${escapeHtml(
+                    gender
+                )}
             </td>
 
             <td>
-                ${escapeHtml(priority)}
+                ${escapeHtml(
+                    priority
+                )}
             </td>
 
             <td>
-                ${escapeHtml(email)}
+                ${escapeHtml(
+                    email
+                )}
             </td>
 
             <td>
+
                 <button
                     type="button"
                     class="btn btn-small btn-primary assign-unallocated"
-                    data-student-id="${escapeHtml(assignId)}"
-                    data-student-number="${escapeHtml(studentNumber)}"
-                    data-student-gender="${escapeHtml(gender)}"
+                    data-student-id="${escapeHtml(
+                        assignId
+                    )}"
+                    data-student-number="${escapeHtml(
+                        studentNumber
+                    )}"
+                    data-student-gender="${escapeHtml(
+                        gender
+                    )}"
                 >
                     Assign Room
                 </button>
+
             </td>
 
         </tr>
@@ -1991,15 +2192,18 @@ async function assignUnallocatedStudent(
         const button =
             document.querySelector(
                 `.assign-unallocated[data-student-id="${CSS.escape(
-                    studentId
+                    String(studentId)
                 )}"]`
             );
 
         const studentRow =
-            button?.closest("tr");
+            button?.closest(
+                "tr"
+            );
 
         let gender =
-            genderFromButton || "";
+            genderFromButton ||
+            "";
 
         if (!gender && button) {
             gender =
@@ -2009,7 +2213,9 @@ async function assignUnallocatedStudent(
 
         if (!gender && studentRow) {
             const cells =
-                studentRow.querySelectorAll("td");
+                studentRow.querySelectorAll(
+                    "td"
+                );
 
             if (cells.length >= 5) {
                 gender =
@@ -2018,9 +2224,6 @@ async function assignUnallocatedStudent(
             }
         }
 
-        /*
-         * Ask backend for beds matching the student's gender.
-         */
         const beds =
             await getAvailableBeds(
                 gender
@@ -2135,6 +2338,7 @@ async function assignUnallocatedStudent(
         );
 
         await loadEverything();
+
     } catch (error) {
         console.error(
             "Assign unallocated student error:",
@@ -2143,7 +2347,7 @@ async function assignUnallocatedStudent(
 
         showToast(
             error?.message ||
-                "Unable to assign this student.",
+            "Unable to assign this student.",
             "error"
         );
     }
@@ -2163,13 +2367,19 @@ async function loadAuditLogs() {
     }
 
     let tbody =
-        table.querySelector("tbody");
+        table.querySelector(
+            "tbody"
+        );
 
     if (!tbody) {
         tbody =
-            document.createElement("tbody");
+            document.createElement(
+                "tbody"
+            );
 
-        table.appendChild(tbody);
+        table.appendChild(
+            tbody
+        );
     }
 
     tbody.innerHTML = `
@@ -2263,6 +2473,7 @@ async function loadAuditLogs() {
                     `
                 )
                 .join("");
+
     } catch (error) {
         console.error(
             "Audit log error:",
@@ -2347,7 +2558,9 @@ function downloadCsv(
             .map(
                 (row) =>
                     row
-                        .map(csvEscape)
+                        .map(
+                            csvEscape
+                        )
                         .join(",")
             )
             .join("\r\n");
@@ -2367,18 +2580,27 @@ function downloadCsv(
         );
 
     const link =
-        document.createElement("a");
+        document.createElement(
+            "a"
+        );
 
-    link.href = url;
-    link.download = filename;
+    link.href =
+        url;
 
-    document.body.appendChild(link);
+    link.download =
+        filename;
+
+    document.body.appendChild(
+        link
+    );
 
     link.click();
 
     link.remove();
 
-    URL.revokeObjectURL(url);
+    URL.revokeObjectURL(
+        url
+    );
 }
 
 
@@ -2435,23 +2657,40 @@ async function exportAllocations() {
         allocations.forEach(
             (item) => {
                 rows.push([
-                    item.allocation_number || "",
-                    item.student_name || "",
+                    item.allocation_number ||
+                        "",
+
+                    item.student_name ||
+                        "",
+
                     item.student_number ||
                         item.student_id_number ||
                         item.student_id ||
                         "",
-                    item.level || "",
-                    item.programme || "",
-                    item.gender || "",
-                    item.block || "",
+
+                    item.level ||
+                        "",
+
+                    item.programme ||
+                        "",
+
+                    item.gender ||
+                        "",
+
+                    item.block ||
+                        "",
+
                     item.room_code ||
                         item.room_number ||
                         "",
+
                     item.bed_code ||
                         item.bed_number ||
                         "",
-                    item.status || "",
+
+                    item.status ||
+                        "",
+
                     formatDate(
                         item.allocated_at ||
                         item.created_at
@@ -2468,6 +2707,7 @@ async function exportAllocations() {
         showToast(
             "Allocations exported successfully."
         );
+
     } catch (error) {
         console.error(
             "Allocation export error:",
@@ -2526,15 +2766,20 @@ async function exportUnallocated() {
                         student.id ||
                         "",
 
-                    student.level || "",
+                    student.level ||
+                        "",
 
-                    student.programme || "",
+                    student.programme ||
+                        "",
 
-                    student.gender || "",
+                    student.gender ||
+                        "",
 
-                    student.priority_group || "",
+                    student.priority_group ||
+                        "",
 
-                    student.email || ""
+                    student.email ||
+                        ""
                 ]);
             }
         );
@@ -2547,6 +2792,7 @@ async function exportUnallocated() {
         showToast(
             "Unallocated students exported successfully."
         );
+
     } catch (error) {
         console.error(
             "Unallocated export error:",
@@ -2573,6 +2819,10 @@ function printReport() {
 function activateSection(
     sectionId
 ) {
+    if (!sectionId) {
+        return;
+    }
+
     const sections =
         $$(".admin-section");
 
@@ -2661,10 +2911,6 @@ function initialiseNavigation() {
                             return;
                         }
 
-                        /*
-                         * Do not allow non-super-admins
-                         * into administrator management.
-                         */
                         if (
                             sectionId ===
                                 "adminManagementSection" &&
@@ -2818,7 +3064,8 @@ async function loadAdministrators() {
                 "admin-management",
                 {
                     body: {
-                        action: "list"
+                        action:
+                            "list"
                     }
                 }
             );
@@ -2877,6 +3124,7 @@ async function loadAdministrators() {
                             </td>
 
                             <td>
+
                                 <div class="table-actions">
 
                                     <button
@@ -2916,12 +3164,14 @@ async function loadAdministrators() {
                                     </button>
 
                                 </div>
+
                             </td>
 
                         </tr>
                     `
                 )
                 .join("");
+
     } catch (error) {
         console.error(
             "Administrator load error:",
@@ -2978,7 +3228,8 @@ function openAdminModal(
 
     if (emailInput) {
         emailInput.value =
-            admin?.email || "";
+            admin?.email ||
+            "";
     }
 
     const roleSelect =
@@ -2994,14 +3245,16 @@ function openAdminModal(
         $("#adminPassword");
 
     if (passwordInput) {
-        passwordInput.value = "";
+        passwordInput.value =
+            "";
     }
 
     const formError =
         $("#adminFormError");
 
     if (formError) {
-        formError.textContent = "";
+        formError.textContent =
+            "";
     }
 
     form.dataset.adminId =
@@ -3013,7 +3266,8 @@ function openAdminModal(
         "open"
     );
 
-    modal.style.display = "";
+    modal.style.display =
+        "";
 }
 
 
@@ -3055,7 +3309,8 @@ async function handleAdminFormSubmit(
         $("#adminEmail")?.value.trim();
 
     const password =
-        $("#adminPassword")?.value || "";
+        $("#adminPassword")?.value ||
+        "";
 
     const role =
         $("#adminRoleSelect")?.value ||
@@ -3068,7 +3323,8 @@ async function handleAdminFormSubmit(
         $("#saveAdminButton");
 
     if (errorElement) {
-        errorElement.textContent = "";
+        errorElement.textContent =
+            "";
     }
 
     if (!email) {
@@ -3131,7 +3387,8 @@ async function handleAdminFormSubmit(
             await supabase.functions.invoke(
                 "admin-management",
                 {
-                    body: payload
+                    body:
+                        payload
                 }
             );
 
@@ -3154,6 +3411,7 @@ async function handleAdminFormSubmit(
         );
 
         await loadAdministrators();
+
     } catch (error) {
         console.error(
             "Administrator save error:",
@@ -3165,6 +3423,7 @@ async function handleAdminFormSubmit(
                 error?.message ||
                 "Unable to save administrator.";
         }
+
     } finally {
         setButtonLoading(
             saveButton,
@@ -3214,7 +3473,9 @@ async function deleteAdministrator(
                 "admin-management",
                 {
                     body: {
-                        action: "delete",
+                        action:
+                            "delete",
+
                         user_id:
                             adminId
                     }
@@ -3236,6 +3497,7 @@ async function deleteAdministrator(
         );
 
         await loadAdministrators();
+
     } catch (error) {
         console.error(
             "Administrator delete error:",
@@ -3244,7 +3506,7 @@ async function deleteAdministrator(
 
         showToast(
             error?.message ||
-                "Unable to remove administrator.",
+            "Unable to remove administrator.",
             "error"
         );
     }
@@ -3279,8 +3541,11 @@ function initialiseAllocationActions() {
 
             if (reassignButton) {
                 await reassignAllocation(
-                    reassignButton.dataset.allocationId,
-                    reassignButton.dataset.currentBedId
+                    reassignButton.dataset
+                        .allocationId,
+
+                    reassignButton.dataset
+                        .currentBedId
                 );
 
                 return;
@@ -3293,7 +3558,8 @@ function initialiseAllocationActions() {
 
             if (unassignButton) {
                 await unassignAllocation(
-                    unassignButton.dataset.allocationId
+                    unassignButton.dataset
+                        .allocationId
                 );
             }
         }
@@ -3361,13 +3627,16 @@ function initialiseAdminManagementActions() {
             if (editButton) {
                 openAdminModal({
                     id:
-                        editButton.dataset.adminId,
+                        editButton.dataset
+                            .adminId,
 
                     email:
-                        editButton.dataset.adminEmail,
+                        editButton.dataset
+                            .adminEmail,
 
                     role:
-                        editButton.dataset.adminRole
+                        editButton.dataset
+                            .adminRole
                 });
 
                 return;
@@ -3380,8 +3649,11 @@ function initialiseAdminManagementActions() {
 
             if (deleteButton) {
                 await deleteAdministrator(
-                    deleteButton.dataset.adminId,
-                    deleteButton.dataset.adminEmail
+                    deleteButton.dataset
+                        .adminId,
+
+                    deleteButton.dataset
+                        .adminEmail
                 );
             }
         }
@@ -3560,6 +3832,7 @@ function initialiseButtons() {
                     showToast(
                         "Dashboard refreshed."
                     );
+
                 } catch (error) {
                     console.error(
                         "Refresh error:",
@@ -3570,6 +3843,7 @@ function initialiseButtons() {
                         "Unable to refresh dashboard.",
                         "error"
                     );
+
                 } finally {
                     setButtonLoading(
                         refreshButton,
@@ -3785,45 +4059,165 @@ async function initialise() {
         return;
     }
 
+    /*
+     * If another path has already completed the application
+     * initialization, there is nothing else to do.
+     */
+    if (applicationInitialised) {
+        return;
+    }
+
     isInitialising = true;
 
     try {
+        /*
+         * Attach all UI events exactly once.
+         */
         initialiseNavigation();
+
         initialiseAllocationActions();
+
         initialiseUnallocatedActions();
+
         initialiseAdminManagementActions();
+
         initialiseRoomActions();
+
         initialiseSearchAndFilters();
+
         initialiseButtons();
+
+        initialiseFormEvents();
+
         initialiseKeyboardHandlers();
 
-        const session = await getCurrentSession();
 
+        /*
+         * Determine the existing authentication state.
+         */
+        const session =
+            await getCurrentSession();
+
+
+        /*
+         * No authenticated session.
+         */
         if (!session) {
+            currentUser = null;
+            currentProfile = null;
+
+            authStateInitialised =
+                false;
+
+            applicationInitialised =
+                false;
+
             showLogin();
+
             return;
         }
 
-        /*
-         * The existing authenticated session is loaded here.
-         * The auth listener is prevented from duplicating this
-         * initialisation.
-         */
-        currentUser = session.user;
 
+        /*
+         * Valid authenticated session.
+         */
+        currentUser =
+            session.user;
+
+
+        if (!currentUser) {
+            currentProfile = null;
+
+            authStateInitialised =
+                false;
+
+            applicationInitialised =
+                false;
+
+            showLogin();
+
+            return;
+        }
+
+
+        /*
+         * Load profile.
+         *
+         * Profile failure is intentionally non-fatal.
+         */
         await loadCurrentProfile();
 
+
+        /*
+         * Show application immediately.
+         */
         showApp();
 
         updateRoleDisplay();
 
-        await initialiseAdminManagement();
 
-        await loadEverything();
+        /*
+         * CRITICAL:
+         *
+         * Mark authentication initialization as handled
+         * BEFORE starting data loads.
+         *
+         * This prevents the Supabase auth callback from
+         * starting a second initialization simultaneously.
+         */
+        authStateInitialised =
+            true;
 
-        activateSection("dashboardSection");
+        applicationInitialised =
+            true;
 
-        authStateInitialised = true;
+
+        /*
+         * Administrator management is auxiliary.
+         *
+         * It must NEVER prevent the main dashboard from
+         * appearing.
+         */
+        try {
+            await initialiseAdminManagement();
+
+        } catch (error) {
+            console.error(
+                "Admin management failed to initialise:",
+                error
+            );
+        }
+
+
+        /*
+         * Main application data.
+         *
+         * loadEverything() already uses Promise.allSettled(),
+         * so one failed section cannot destroy the others.
+         */
+        try {
+            await loadEverything();
+
+        } catch (error) {
+            console.error(
+                "Main dashboard loading failed:",
+                error
+            );
+        }
+
+
+        /*
+         * Always leave the user on the dashboard after the
+         * initial authenticated load.
+         */
+        activateSection(
+            "dashboardSection"
+        );
+
+
+        console.log(
+            "UHAS Asogli admin portal initialised successfully."
+        );
 
     } catch (error) {
         console.error(
@@ -3831,15 +4225,35 @@ async function initialise() {
             error
         );
 
-        showLogin();
 
-        showToast(
-            error?.message ||
-            "Unable to initialise the admin portal.",
-            "error"
-        );
+        /*
+         * CRITICAL FIX:
+         *
+         * Do NOT hide an authenticated application merely
+         * because one initialization operation failed.
+         */
+        if (currentUser) {
+            showApp();
+
+            showToast(
+                error?.message ||
+                "Some admin data could not be loaded.",
+                "error"
+            );
+
+        } else {
+            showLogin();
+
+            showToast(
+                error?.message ||
+                "Unable to initialise the admin portal.",
+                "error"
+            );
+        }
+
     } finally {
-        isInitialising = false;
+        isInitialising =
+            false;
     }
 }
 
@@ -3848,61 +4262,161 @@ async function initialise() {
    AUTH STATE CHANGES
    ========================================================= */
 
-let authStateInitialised = false;
-
 supabase.auth.onAuthStateChange(
-    async (_event, session) => {
+    async (
+        event,
+        session
+    ) => {
         try {
-            if (!session) {
-                currentUser = null;
-                currentProfile = null;
+            console.log(
+                "Supabase auth state:",
+                event
+            );
 
-                showLogin();
-
-                return;
-            }
 
             /*
-             * Prevent the initial session event from causing
-             * a second complete application initialisation.
+             * SIGNED OUT / NO SESSION
+             *
+             * Never blindly call showLogin() based only on the
+             * callback's session value.
              */
-            if (authStateInitialised) {
+            if (!session) {
+                const currentSession =
+                    await getCurrentSession();
+
+
+                /*
+                 * Supabase genuinely has no session.
+                 */
+                if (!currentSession) {
+                    currentUser = null;
+                    currentProfile = null;
+
+                    authStateInitialised =
+                        false;
+
+                    applicationInitialised =
+                        false;
+
+                    adminManagementInitialised =
+                        false;
+
+                    showLogin();
+                }
+
+
+                /*
+                 * If getCurrentSession() still has a session,
+                 * leave the application visible.
+                 */
                 return;
             }
 
-            authStateInitialised = true;
 
-            currentUser = session.user;
+            /*
+             * We have an authenticated session.
+             */
+            currentUser =
+                session.user;
 
+
+            /*
+             * The main initialise() function or handleLogin()
+             * may already have completed the initialization.
+             *
+             * Do NOT initialize the application again.
+             */
+            if (
+                authStateInitialised ||
+                applicationInitialised
+            ) {
+                return;
+            }
+
+
+            /*
+             * Genuine post-load SIGNED_IN event.
+             */
             await loadCurrentProfile();
+
 
             showApp();
 
             updateRoleDisplay();
 
-            await initialiseAdminManagement();
 
-            await loadEverything();
+            /*
+             * Mark initialized before network operations to
+             * prevent another auth callback from duplicating
+             * initialization.
+             */
+            authStateInitialised =
+                true;
 
-            activateSection("dashboardSection");
+            applicationInitialised =
+                true;
+
+
+            /*
+             * Administrator management is optional.
+             */
+            try {
+                await initialiseAdminManagement();
+
+            } catch (error) {
+                console.error(
+                    "Admin management initialisation failed:",
+                    error
+                );
+            }
+
+
+            /*
+             * Main dashboard.
+             */
+            try {
+                await loadEverything();
+
+            } catch (error) {
+                console.error(
+                    "Dashboard loading failed:",
+                    error
+                );
+            }
+
+
+            activateSection(
+                "dashboardSection"
+            );
+
 
         } catch (error) {
             console.error(
-                "Auth state initialisation error:",
+                "Auth state handling error:",
                 error
             );
 
-            showToast(
-                error?.message ||
-                "Unable to initialise the admin portal.",
-                "error"
-            );
+
+            /*
+             * Never destroy an authenticated application
+             * because of an auth callback error.
+             */
+            if (currentUser) {
+                showApp();
+
+                showToast(
+                    error?.message ||
+                    "Unable to process authentication state.",
+                    "error"
+                );
+            }
         }
     }
 );
 
+
 /* =========================================================
-   START
+   START APPLICATION
    ========================================================= */
 
 if (
@@ -3916,6 +4430,7 @@ if (
             once: true
         }
     );
+
 } else {
     initialise();
 }
