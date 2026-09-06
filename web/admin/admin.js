@@ -537,60 +537,52 @@ async function handleLogin(event) {
         }
 
         currentUser =
-            data?.user || null;
+    data?.user || null;
 
-        if (!currentUser) {
-            throw new Error(
-                "Login succeeded but no authenticated user was returned."
-            );
-        }
+if (!currentUser) {
+    throw new Error(
+        "Login succeeded but no authenticated user was returned."
+    );
+}
 
-        /*
-         * Mark the login as being handled here.
-         *
-         * This prevents the simultaneous Supabase auth event
-         * from starting a second complete initialization.
-         */
-        authStateInitialised = true;
-        applicationInitialised = true;
+/*
+ * Prevent the Supabase SIGNED_IN callback
+ * from performing a second initialization.
+ */
+authStateInitialised = true;
+applicationInitialised = true;
 
-        await loadCurrentProfile();
+await loadCurrentProfile();
 
-        showApp();
+showApp();
 
-        updateRoleDisplay();
+updateRoleDisplay();
 
-        /*
-         * Administrator management is optional.
-         */
-        try {
-            await initialiseAdminManagement();
-        } catch (error) {
-            console.error(
-                "Admin management initialisation failed:",
-                error
-            );
-        }
+try {
+    await initialiseAdminManagement();
+} catch (error) {
+    console.error(
+        "Admin management initialisation failed:",
+        error
+    );
+}
 
-        /*
-         * Main dashboard data.
-         */
-        try {
-            await loadEverything();
-        } catch (error) {
-            console.error(
-                "Dashboard loading failed:",
-                error
-            );
-        }
+try {
+    await loadEverything();
+} catch (error) {
+    console.error(
+        "Dashboard loading failed:",
+        error
+    );
+}
 
-        activateSection(
-            "dashboardSection"
-        );
+activateSection(
+    "dashboardSection"
+);
 
-        showToast(
-            "Login successful."
-        );
+showToast(
+    "Login successful."
+);
 
     } catch (error) {
         console.error(
@@ -4263,134 +4255,124 @@ async function initialise() {
    ========================================================= */
 
 supabase.auth.onAuthStateChange(
-    async (
-        event,
-        session
-    ) => {
+    async (event, session) => {
         try {
             console.log(
                 "Supabase auth state:",
-                event
+                event,
+                session?.user?.email || "No session"
             );
+
+            /*
+             * INITIAL_SESSION
+             *
+             * initialise() is responsible for the initial
+             * application load. Therefore we do NOT load the
+             * dashboard again here.
+             */
+            if (event === "INITIAL_SESSION") {
+                return;
+            }
 
 
             /*
-             * SIGNED OUT / NO SESSION
-             *
-             * Never blindly call showLogin() based only on the
-             * callback's session value.
+             * SIGNED OUT
              */
-            if (!session) {
-                const currentSession =
-                    await getCurrentSession();
+            if (event === "SIGNED_OUT" || !session) {
+                currentUser = null;
+                currentProfile = null;
+
+                authStateInitialised = false;
+                applicationInitialised = false;
+                adminManagementInitialised = false;
+
+                showLogin();
+
+                return;
+            }
+
+
+            /*
+             * SIGNED IN
+             *
+             * This handles a genuine login event that occurs
+             * after the initial application load.
+             */
+            if (event === "SIGNED_IN") {
+
+                /*
+                 * handleLogin() already performs the complete
+                 * initialization after signInWithPassword().
+                 *
+                 * Do not repeat it here.
+                 */
+                if (
+                    applicationInitialised ||
+                    authStateInitialised
+                ) {
+                    return;
+                }
+
+
+                currentUser =
+                    session.user;
+
+
+                await loadCurrentProfile();
+
+
+                showApp();
+
+                updateRoleDisplay();
 
 
                 /*
-                 * Supabase genuinely has no session.
+                 * Set these BEFORE loading remote data.
+                 * This prevents duplicate initialization.
                  */
-                if (!currentSession) {
-                    currentUser = null;
-                    currentProfile = null;
+                authStateInitialised =
+                    true;
 
-                    authStateInitialised =
-                        false;
+                applicationInitialised =
+                    true;
 
-                    applicationInitialised =
-                        false;
 
-                    adminManagementInitialised =
-                        false;
+                /*
+                 * Administrator management is optional.
+                 */
+                try {
+                    await initialiseAdminManagement();
 
-                    showLogin();
+                } catch (error) {
+                    console.error(
+                        "Admin management initialisation failed:",
+                        error
+                    );
                 }
 
 
                 /*
-                 * If getCurrentSession() still has a session,
-                 * leave the application visible.
+                 * Load dashboard data once.
                  */
-                return;
-            }
+                try {
+                    await loadEverything();
+
+                } catch (error) {
+                    console.error(
+                        "Dashboard loading failed:",
+                        error
+                    );
+                }
 
 
-            /*
-             * We have an authenticated session.
-             */
-            currentUser =
-                session.user;
-
-
-            /*
-             * The main initialise() function or handleLogin()
-             * may already have completed the initialization.
-             *
-             * Do NOT initialize the application again.
-             */
-            if (
-                authStateInitialised ||
-                applicationInitialised
-            ) {
-                return;
-            }
-
-
-            /*
-             * Genuine post-load SIGNED_IN event.
-             */
-            await loadCurrentProfile();
-
-
-            showApp();
-
-            updateRoleDisplay();
-
-
-            /*
-             * Mark initialized before network operations to
-             * prevent another auth callback from duplicating
-             * initialization.
-             */
-            authStateInitialised =
-                true;
-
-            applicationInitialised =
-                true;
-
-
-            /*
-             * Administrator management is optional.
-             */
-            try {
-                await initialiseAdminManagement();
-
-            } catch (error) {
-                console.error(
-                    "Admin management initialisation failed:",
-                    error
+                activateSection(
+                    "dashboardSection"
                 );
             }
-
-
-            /*
-             * Main dashboard.
-             */
-            try {
-                await loadEverything();
-
-            } catch (error) {
-                console.error(
-                    "Dashboard loading failed:",
-                    error
-                );
-            }
-
-
-            activateSection(
-                "dashboardSection"
-            );
 
 
         } catch (error) {
+
             console.error(
                 "Auth state handling error:",
                 error
@@ -4398,7 +4380,7 @@ supabase.auth.onAuthStateChange(
 
 
             /*
-             * Never destroy an authenticated application
+             * Never hide an authenticated application
              * because of an auth callback error.
              */
             if (currentUser) {
@@ -4413,7 +4395,6 @@ supabase.auth.onAuthStateChange(
         }
     }
 );
-
 
 /* =========================================================
    START APPLICATION
