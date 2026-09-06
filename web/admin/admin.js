@@ -1790,10 +1790,8 @@ async function loadUnallocated() {
                 : [];
 
         console.log(
-            "Unallocated students returned:",
-            students.length,
-            students
-        );
+    `Loaded ${students.length} unallocated students.`
+);
 
         if (!students.length) {
             tbody.innerHTML = `
@@ -3787,52 +3785,31 @@ async function initialise() {
         return;
     }
 
-    if (applicationInitialised) {
-        return;
-    }
-
     isInitialising = true;
 
     try {
-        /*
-         * Attach all static events first.
-         */
-        initialiseFormEvents();
-
         initialiseNavigation();
-
         initialiseAllocationActions();
-
-        /*
-         * This now creates the unallocated tbody
-         * automatically if necessary.
-         */
         initialiseUnallocatedActions();
-
         initialiseAdminManagementActions();
-
         initialiseRoomActions();
-
         initialiseSearchAndFilters();
-
         initialiseButtons();
-
         initialiseKeyboardHandlers();
 
-        const session =
-            await getCurrentSession();
+        const session = await getCurrentSession();
 
         if (!session) {
             showLogin();
-
-            applicationInitialised =
-                true;
-
             return;
         }
 
-        currentUser =
-            session.user;
+        /*
+         * The existing authenticated session is loaded here.
+         * The auth listener is prevented from duplicating this
+         * initialisation.
+         */
+        currentUser = session.user;
 
         await loadCurrentProfile();
 
@@ -3842,20 +3819,12 @@ async function initialise() {
 
         await initialiseAdminManagement();
 
-        /*
-         * The unallocated table body may have been
-         * dynamically created during page setup.
-         */
-        initialiseUnallocatedActions();
-
         await loadEverything();
 
-        activateSection(
-            "dashboardSection"
-        );
+        activateSection("dashboardSection");
 
-        applicationInitialised =
-            true;
+        authStateInitialised = true;
+
     } catch (error) {
         console.error(
             "Admin initialisation error:",
@@ -3866,7 +3835,7 @@ async function initialise() {
 
         showToast(
             error?.message ||
-                "Unable to initialise the admin portal.",
+            "Unable to initialise the admin portal.",
             "error"
         );
     } finally {
@@ -3876,55 +3845,61 @@ async function initialise() {
 
 
 /* =========================================================
-   AUTH STATE CHANGE
+   AUTH STATE CHANGES
    ========================================================= */
 
+let authStateInitialised = false;
+
 supabase.auth.onAuthStateChange(
-    async (
-        event,
-        session
-    ) => {
-        /*
-         * Ignore the INITIAL_SESSION event when
-         * initialise() is already processing it.
-         */
-        if (
-            event ===
-                "INITIAL_SESSION"
-        ) {
-            return;
+    async (_event, session) => {
+        try {
+            if (!session) {
+                currentUser = null;
+                currentProfile = null;
+
+                showLogin();
+
+                return;
+            }
+
+            /*
+             * Prevent the initial session event from causing
+             * a second complete application initialisation.
+             */
+            if (authStateInitialised) {
+                return;
+            }
+
+            authStateInitialised = true;
+
+            currentUser = session.user;
+
+            await loadCurrentProfile();
+
+            showApp();
+
+            updateRoleDisplay();
+
+            await initialiseAdminManagement();
+
+            await loadEverything();
+
+            activateSection("dashboardSection");
+
+        } catch (error) {
+            console.error(
+                "Auth state initialisation error:",
+                error
+            );
+
+            showToast(
+                error?.message ||
+                "Unable to initialise the admin portal.",
+                "error"
+            );
         }
-
-        if (!session) {
-            currentUser = null;
-            currentProfile = null;
-
-            showLogin();
-
-            return;
-        }
-
-        /*
-         * Do not duplicate the complete
-         * initialisation process.
-         */
-        currentUser =
-            session.user;
-
-        await loadCurrentProfile();
-
-        showApp();
-
-        updateRoleDisplay();
-
-        await initialiseAdminManagement();
-
-        initialiseUnallocatedActions();
-
-        await loadEverything();
     }
 );
-
 
 /* =========================================================
    START
