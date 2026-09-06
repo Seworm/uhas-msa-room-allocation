@@ -475,11 +475,17 @@ async function handleLogin(event) {
         return;
     }
 
+    /*
+     * Form elements handle both #loginEmail / #loginPassword
+     * and fallback to #email / #password matching the HTML.
+     */
     const emailInput =
-        document.getElementById("loginEmail");
+        document.getElementById("loginEmail") ||
+        document.getElementById("email");
 
     const passwordInput =
-        document.getElementById("loginPassword");
+        document.getElementById("loginPassword") ||
+        document.getElementById("password");
 
     const email =
         emailInput?.value?.trim();
@@ -649,6 +655,8 @@ function showLogin() {
 
         appView.hidden =
             true;
+
+        appView.classList.add("hidden");
     }
 }
 
@@ -674,6 +682,8 @@ function showApp() {
 
         appView.hidden =
             false;
+
+        appView.classList.remove("hidden");
     }
 }
 
@@ -682,7 +692,8 @@ async function handlePasswordReset(event) {
     event.preventDefault();
 
     const email =
-        $("#email")?.value.trim() || $("#loginEmail")?.value.trim();
+        $("#email")?.value.trim() ||
+        $("#loginEmail")?.value.trim();
 
     if (!email) {
         showToast(
@@ -1146,6 +1157,10 @@ async function openRoomModal(roomId) {
         "open"
     );
 
+    modal.classList.remove(
+        "hidden"
+    );
+
     modal.style.display =
         "";
 
@@ -1268,6 +1283,10 @@ function closeRoomModal() {
         "open"
     );
 
+    modal.classList.add(
+        "hidden"
+    );
+
     modal.style.display =
         "none";
 }
@@ -1278,10 +1297,10 @@ function closeRoomModal() {
    ========================================================= */
 
 async function loadAllocations() {
-    const table =
+    const tbody =
         $("#allocationsTable");
 
-    if (!table) {
+    if (!tbody) {
         return;
     }
 
@@ -1296,22 +1315,6 @@ async function loadAllocations() {
     const search =
         $("#studentSearch")?.value.trim() ||
         "";
-
-    let tbody =
-        table.querySelector(
-            "tbody"
-        );
-
-    if (!tbody) {
-        tbody =
-            document.createElement(
-                "tbody"
-            );
-
-        table.appendChild(
-            tbody
-        );
-    }
 
     tbody.innerHTML = `
         <tr>
@@ -1446,7 +1449,7 @@ function renderAllocationRow(
             <td>
                 ${escapeHtml(
                     allocation.allocation_number ||
-                    "—"
+                    studentNumber
                 )}
             </td>
 
@@ -1456,23 +1459,10 @@ function renderAllocationRow(
                         studentName
                     )}
                 </strong>
-
-                <small>
-                    ${escapeHtml(
-                        studentNumber
-                    )}
-                </small>
             </td>
 
             <td>
                 ${escapeHtml(level)}
-            </td>
-
-            <td>
-                ${escapeHtml(
-                    allocation.programme ||
-                    "—"
-                )}
             </td>
 
             <td>
@@ -1497,15 +1487,6 @@ function renderAllocationRow(
                 )}">
                     ${escapeHtml(status)}
                 </span>
-            </td>
-
-            <td>
-                ${escapeHtml(
-                    formatDate(
-                        allocation.allocated_at ||
-                        allocation.created_at
-                    )
-                )}
             </td>
 
             <td>
@@ -1573,66 +1554,6 @@ async function getAvailableBeds(
 }
 
 
-function buildBedOptions(
-    beds
-) {
-    if (!beds.length) {
-        return "";
-    }
-
-    return beds
-        .map(
-            (bed) => {
-                const bedId =
-                    bed.bed_id ||
-                    bed.id ||
-                    "";
-
-                const room =
-                    bed.room_code ||
-                    bed.room_number ||
-                    "Room";
-
-                const bedName =
-                    bed.bed_code ||
-                    bed.bed_number ||
-                    bed.bed_label ||
-                    bed.name ||
-                    bedId;
-
-                const block =
-                    bed.block ||
-                    "";
-
-                const floor =
-                    bed.floor === null ||
-                    bed.floor === undefined
-                        ? ""
-                        : `Floor ${bed.floor}`;
-
-                const label =
-                    [
-                        room,
-                        bedName,
-                        block,
-                        floor
-                    ]
-                        .filter(Boolean)
-                        .join(" · ");
-
-                return `
-                    <option
-                        value="${escapeHtml(bedId)}"
-                    >
-                        ${escapeHtml(label)}
-                    </option>
-                `;
-            }
-        )
-        .join("");
-}
-
-
 /* =========================================================
    REASSIGN
    ========================================================= */
@@ -1666,9 +1587,9 @@ async function reassignAllocation(
                 "td"
             );
 
-        if (cells.length >= 5) {
+        if (cells.length >= 4) {
             gender =
-                cells[4]?.textContent.trim() ||
+                cells[3]?.textContent.trim() ||
                 "";
         }
     }
@@ -1885,7 +1806,7 @@ function getUnallocatedTableBody() {
     }
 
     const table =
-        $("#unallocatedTable");
+        $("#unallocatedSection table");
 
     if (!table) {
         return null;
@@ -1956,10 +1877,6 @@ async function loadUnallocated() {
             Array.isArray(data)
                 ? data
                 : [];
-
-        console.log(
-            `Loaded ${students.length} unallocated students.`
-        );
 
         if (!students.length) {
             tbody.innerHTML = `
@@ -2060,10 +1977,6 @@ function renderUnallocatedRow(
         student.gender ||
         "—";
 
-    const priority =
-        student.priority_group ||
-        "—";
-
     const email =
         student.email ||
         "—";
@@ -2082,17 +1995,17 @@ function renderUnallocatedRow(
         >
 
             <td>
+                ${escapeHtml(
+                    studentNumber
+                )}
+            </td>
+
+            <td>
                 <strong>
                     ${escapeHtml(
                         studentName
                     )}
                 </strong>
-            </td>
-
-            <td>
-                ${escapeHtml(
-                    studentNumber
-                )}
             </td>
 
             <td>
@@ -2110,12 +2023,6 @@ function renderUnallocatedRow(
             <td>
                 ${escapeHtml(
                     gender
-                )}
-            </td>
-
-            <td>
-                ${escapeHtml(
-                    priority
                 )}
             </td>
 
@@ -2338,27 +2245,11 @@ async function assignUnallocatedStudent(
    ========================================================= */
 
 async function loadAuditLogs() {
-    const table =
+    const tbody =
         $("#auditTable");
 
-    if (!table) {
-        return;
-    }
-
-    let tbody =
-        table.querySelector(
-            "tbody"
-        );
-
     if (!tbody) {
-        tbody =
-            document.createElement(
-                "tbody"
-            );
-
-        table.appendChild(
-            tbody
-        );
+        return;
     }
 
     tbody.innerHTML = `
@@ -2420,16 +2311,17 @@ async function loadAuditLogs() {
 
                             <td>
                                 ${escapeHtml(
+                                    log.target ||
+                                    log.target_type ||
                                     log.actor_email ||
-                                    log.user_email ||
                                     "—"
                                 )}
                             </td>
 
                             <td>
                                 ${escapeHtml(
-                                    log.target ||
-                                    log.target_type ||
+                                    log.target_id ||
+                                    log.entity_id ||
                                     "—"
                                 )}
                             </td>
@@ -2623,7 +2515,6 @@ async function exportAllocations() {
                 "Student Name",
                 "Student ID",
                 "Level",
-                "Programme",
                 "Gender",
                 "Block",
                 "Room",
@@ -2648,9 +2539,6 @@ async function exportAllocations() {
                         "",
 
                     item.level ||
-                        "",
-
-                    item.programme ||
                         "",
 
                     item.gender ||
@@ -2728,7 +2616,6 @@ async function exportUnallocated() {
                 "Level",
                 "Programme",
                 "Gender",
-                "Priority Group",
                 "Email"
             ]
         ];
@@ -2752,9 +2639,6 @@ async function exportUnallocated() {
                         "",
 
                     student.gender ||
-                        "",
-
-                    student.priority_group ||
                         "",
 
                     student.email ||
@@ -2818,6 +2702,11 @@ function activateSection(
                 matches
             );
 
+            section.classList.toggle(
+                "active-section",
+                matches
+            );
+
             section.style.display =
                 matches
                     ? ""
@@ -2866,7 +2755,7 @@ function activateSection(
 
 
 function initialiseNavigation() {
-    $$(".nav-item[data-section]")
+    $$(".nav-item[data-section], [data-section]")
         .forEach(
             (item) => {
                 if (
@@ -3497,20 +3386,20 @@ async function deleteAdministrator(
    ========================================================= */
 
 function initialiseAllocationActions() {
-    const table =
-        $("#allocationsTable");
+    const section =
+        $("#allocationsSection");
 
     if (
-        !table ||
-        table.dataset.eventsAttached
+        !section ||
+        section.dataset.eventsAttached
     ) {
         return;
     }
 
-    table.dataset.eventsAttached =
+    section.dataset.eventsAttached =
         "true";
 
-    table.addEventListener(
+    section.addEventListener(
         "click",
         async (event) => {
             const reassignButton =
@@ -3547,20 +3436,20 @@ function initialiseAllocationActions() {
 
 
 function initialiseUnallocatedActions() {
-    const tbody =
-        getUnallocatedTableBody();
+    const section =
+        $("#unallocatedSection");
 
     if (
-        !tbody ||
-        tbody.dataset.eventsAttached
+        !section ||
+        section.dataset.eventsAttached
     ) {
         return;
     }
 
-    tbody.dataset.eventsAttached =
+    section.dataset.eventsAttached =
         "true";
 
-    tbody.addEventListener(
+    section.addEventListener(
         "click",
         async (event) => {
             const button =
@@ -4017,7 +3906,7 @@ function initialiseFormEvents() {
    APPLICATION INITIALISATION
    ========================================================= */
 
-async function initialiseAllUI() {
+function initialiseAllUI() {
     initialiseNavigation();
     initialiseAllocationActions();
     initialiseUnallocatedActions();
