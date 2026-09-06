@@ -270,17 +270,6 @@ async function getCurrentSession() {
 }
 
 
-/*
- * IMPORTANT:
- *
- * The current database profiles table does NOT expose
- * auth_user_id according to the existing application logic.
- *
- * Therefore profiles.id is checked against the authenticated
- * user's UUID.
- *
- * Failure to retrieve a profile must NOT destroy the portal.
- */
 async function loadCurrentProfile() {
     currentProfile = null;
 
@@ -332,9 +321,6 @@ async function loadCurrentProfile() {
 
 
 function getUserRole() {
-    /*
-     * Profile role has priority.
-     */
     const profileRole =
         currentProfile?.role ||
         currentProfile?.user_role ||
@@ -346,9 +332,6 @@ function getUserRole() {
         return profileRole;
     }
 
-    /*
-     * Supabase auth metadata fallback.
-     */
     const metadata =
         currentUser?.user_metadata ||
         {};
@@ -377,10 +360,6 @@ function isSuperAdmin() {
         return true;
     }
 
-    /*
-     * Some existing database/backend configurations may
-     * expose the role through the UI instead of the profile.
-     */
     const roleElements = [
         "#adminRole",
         "#mobileAdminRole",
@@ -552,36 +531,17 @@ async function handleLogin(event) {
             );
         }
 
-        /*
-         * Store the authenticated user.
-         */
         currentUser = data.user;
 
-        /*
-         * Load the user's profile.
-         */
         await loadCurrentProfile();
 
-        /*
-         * Show the application.
-         */
         showApp();
 
         updateRoleDisplay();
 
-        /*
-         * Mark application as initialized BEFORE loading
-         * dashboard data.
-         *
-         * This prevents any secondary code from trying
-         * to initialise the application again.
-         */
         authStateInitialised = true;
         applicationInitialised = true;
 
-        /*
-         * Initialise admin management once.
-         */
         try {
 
             await initialiseAdminManagement();
@@ -595,9 +555,6 @@ async function handleLogin(event) {
 
         }
 
-        /*
-         * Load dashboard data once.
-         */
         try {
 
             await loadEverything();
@@ -725,7 +682,7 @@ async function handlePasswordReset(event) {
     event.preventDefault();
 
     const email =
-        $("#email")?.value.trim();
+        $("#email")?.value.trim() || $("#loginEmail")?.value.trim();
 
     if (!email) {
         showToast(
@@ -2053,9 +2010,6 @@ async function loadUnallocated() {
 function renderUnallocatedRow(
     student
 ) {
-    /*
-     * Prefer UUIDs for backend assignment.
-     */
     const studentUuid =
         student.student_uuid ||
         student.student_id_uuid ||
@@ -2559,7 +2513,7 @@ async function loadEverything() {
 
 
 /* =========================================================
-   CSV
+   CSV EXPORT
    ========================================================= */
 
 function downloadCsv(
@@ -3539,7 +3493,7 @@ async function deleteAdministrator(
 
 
 /* =========================================================
-   EVENT DELEGATION
+   EVENT DELEGATION & LISTENERS
    ========================================================= */
 
 function initialiseAllocationActions() {
@@ -3720,10 +3674,6 @@ function initialiseRoomActions() {
 }
 
 
-/* =========================================================
-   SEARCH / FILTERS
-   ========================================================= */
-
 function initialiseSearchAndFilters() {
     const blockFilter =
         $("#blockFilter");
@@ -3826,10 +3776,6 @@ function initialiseSearchAndFilters() {
     }
 }
 
-
-/* =========================================================
-   BUTTONS
-   ========================================================= */
 
 function initialiseButtons() {
     const refreshButton =
@@ -3991,10 +3937,6 @@ function initialiseButtons() {
 }
 
 
-/* =========================================================
-   KEYBOARD
-   ========================================================= */
-
 function initialiseKeyboardHandlers() {
     if (
         document.body.dataset.keyboardAttached
@@ -4019,10 +3961,6 @@ function initialiseKeyboardHandlers() {
     );
 }
 
-
-/* =========================================================
-   FORM EVENTS
-   ========================================================= */
 
 function initialiseFormEvents() {
     const loginForm =
@@ -4079,12 +4017,21 @@ function initialiseFormEvents() {
    APPLICATION INITIALISATION
    ========================================================= */
 
+async function initialiseAllUI() {
+    initialiseNavigation();
+    initialiseAllocationActions();
+    initialiseUnallocatedActions();
+    initialiseAdminManagementActions();
+    initialiseRoomActions();
+    initialiseSearchAndFilters();
+    initialiseButtons();
+    initialiseKeyboardHandlers();
+    initialiseFormEvents();
+}
+
 async function initialise() {
 
     if (applicationInitialised || isInitialising) {
-        console.log(
-            "Application initialisation already running/completed."
-        );
         return;
     }
 
@@ -4092,9 +4039,7 @@ async function initialise() {
 
     try {
 
-        console.log(
-            "Starting UHAS Asogli admin portal..."
-        );
+        initialiseAllUI();
 
         const {
             data: {
@@ -4109,10 +4054,6 @@ async function initialise() {
 
         if (!session?.user) {
 
-            console.log(
-                "No authenticated Supabase session."
-            );
-
             currentUser = null;
             currentProfile = null;
 
@@ -4126,21 +4067,12 @@ async function initialise() {
 
         currentUser = session.user;
 
-        console.log(
-            "Authenticated user:",
-            currentUser.email
-        );
-
         await loadCurrentProfile();
 
         showApp();
 
         updateRoleDisplay();
 
-        /*
-         * Mark initialized BEFORE loading the remaining data.
-         * This prevents duplicate initialization.
-         */
         authStateInitialised = true;
         applicationInitialised = true;
 
@@ -4172,10 +4104,6 @@ async function initialise() {
 
         activateSection(
             "dashboardSection"
-        );
-
-        console.log(
-            "UHAS Asogli admin portal initialised successfully."
         );
 
     } catch (error) {
@@ -4212,85 +4140,23 @@ async function initialise() {
    AUTH STATE CHANGES
    ========================================================= */
 
-/*
- * IMPORTANT:
- * The auth listener is deliberately kept very lightweight.
- *
- * Initial application loading is handled ONLY by initialise().
- * Login loading is handled ONLY by handleLogin().
- *
- * This prevents:
- *
- *     SIGNED_IN
- *          +
- *     INITIAL_SESSION
- *
- * from triggering two complete application initialisations.
- */
-
 supabase.auth.onAuthStateChange((event, session) => {
 
-    console.log(
-        "Supabase auth state:",
-        event,
-        session?.user?.email || "No session"
-    );
-
-    /*
-     * ---------------------------------------------------------
-     * INITIAL_SESSION
-     * ---------------------------------------------------------
-     *
-     * Do absolutely nothing here.
-     *
-     * initialise() is responsible for loading the application.
-     */
     if (event === "INITIAL_SESSION") {
         return;
     }
 
-    /*
-     * ---------------------------------------------------------
-     * SIGNED_IN
-     * ---------------------------------------------------------
-     *
-     * Do NOT initialise anything here.
-     *
-     * handleLogin() is responsible for the login flow.
-     *
-     * This event is informational only.
-     */
     if (event === "SIGNED_IN") {
+        if (!applicationInitialised && session?.user) {
+            initialise();
+        }
         return;
     }
 
-    /*
-     * ---------------------------------------------------------
-     * TOKEN_REFRESHED
-     * ---------------------------------------------------------
-     *
-     * Nothing needs to be reloaded.
-     */
-    if (event === "TOKEN_REFRESHED") {
+    if (event === "TOKEN_REFRESHED" || event === "USER_UPDATED") {
         return;
     }
 
-    /*
-     * ---------------------------------------------------------
-     * USER_UPDATED
-     * ---------------------------------------------------------
-     *
-     * Nothing needs to be reloaded.
-     */
-    if (event === "USER_UPDATED") {
-        return;
-    }
-
-    /*
-     * ---------------------------------------------------------
-     * SIGNED_OUT
-     * ---------------------------------------------------------
-     */
     if (event === "SIGNED_OUT") {
 
         currentUser = null;
@@ -4315,11 +4181,11 @@ if (
     "loading"
 ) {
     document.addEventListener(
-    "DOMContentLoaded",
-    () => {
-        initialise();
-    }
-);
+        "DOMContentLoaded",
+        () => {
+            initialise();
+        }
+    );
 } else {
     initialise();
 }
