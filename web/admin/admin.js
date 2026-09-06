@@ -487,134 +487,167 @@ function updateRoleDisplay() {
    ========================================================= */
 
 async function handleLogin(event) {
-    event.preventDefault();
 
-    const email =
-        $("#email")?.value.trim();
-
-    const password =
-        $("#password")?.value || "";
-
-    const button =
-        $("#loginButton");
-
-    const errorElement =
-        $("#loginError");
-
-    if (errorElement) {
-        errorElement.textContent =
-            "";
+    if (event) {
+        event.preventDefault();
     }
 
-    if (!email || !password) {
-        if (errorElement) {
-            errorElement.textContent =
-                "Enter your email and password.";
-        }
-
+    if (isInitialising) {
         return;
     }
 
-    setButtonLoading(
-        button,
-        true,
-        "Signing in..."
-    );
+    const emailInput =
+        document.getElementById("loginEmail");
+
+    const passwordInput =
+        document.getElementById("loginPassword");
+
+    const email =
+        emailInput?.value?.trim();
+
+    const password =
+        passwordInput?.value || "";
+
+    if (!email || !password) {
+        showToast(
+            "Please enter your email and password.",
+            "error"
+        );
+        return;
+    }
+
+    const loginButton =
+        document.querySelector(
+            "#loginForm button[type='submit'], #loginButton"
+        );
 
     try {
+
+        isInitialising = true;
+
+        if (loginButton) {
+            loginButton.disabled = true;
+        }
+
+        console.log(
+            "Attempting login:",
+            email
+        );
+
         const {
             data,
             error
-        } =
-            await supabase.auth
-                .signInWithPassword({
-                    email,
-                    password
-                });
+        } = await supabase.auth.signInWithPassword({
+            email,
+            password
+        });
 
         if (error) {
             throw error;
         }
 
-        currentUser =
-    data?.user || null;
+        if (!data?.user) {
+            throw new Error(
+                "Login succeeded but no authenticated user was returned."
+            );
+        }
 
-if (!currentUser) {
-    throw new Error(
-        "Login succeeded but no authenticated user was returned."
-    );
-}
+        /*
+         * Store the authenticated user.
+         */
+        currentUser = data.user;
 
-/*
- * Prevent the Supabase SIGNED_IN callback
- * from performing a second initialization.
- */
-authStateInitialised = true;
-applicationInitialised = true;
+        /*
+         * Load the user's profile.
+         */
+        await loadCurrentProfile();
 
-await loadCurrentProfile();
+        /*
+         * Show the application.
+         */
+        showApp();
 
-showApp();
+        updateRoleDisplay();
 
-updateRoleDisplay();
+        /*
+         * Mark application as initialized BEFORE loading
+         * dashboard data.
+         *
+         * This prevents any secondary code from trying
+         * to initialise the application again.
+         */
+        authStateInitialised = true;
+        applicationInitialised = true;
 
-try {
-    await initialiseAdminManagement();
-} catch (error) {
-    console.error(
-        "Admin management initialisation failed:",
-        error
-    );
-}
+        /*
+         * Initialise admin management once.
+         */
+        try {
 
-try {
-    await loadEverything();
-} catch (error) {
-    console.error(
-        "Dashboard loading failed:",
-        error
-    );
-}
+            await initialiseAdminManagement();
 
-activateSection(
-    "dashboardSection"
-);
+        } catch (error) {
 
-showToast(
-    "Login successful."
-);
+            console.error(
+                "Admin management initialisation failed:",
+                error
+            );
+
+        }
+
+        /*
+         * Load dashboard data once.
+         */
+        try {
+
+            await loadEverything();
+
+        } catch (error) {
+
+            console.error(
+                "Dashboard loading failed:",
+                error
+            );
+
+            showToast(
+                "Some dashboard data could not be loaded.",
+                "error"
+            );
+        }
+
+        activateSection(
+            "dashboardSection"
+        );
+
+        showToast(
+            "Login successful.",
+            "success"
+        );
 
     } catch (error) {
+
         console.error(
             "Login error:",
             error
         );
 
-        /*
-         * A failed login must always return to the login
-         * interface rather than leaving the interface half-loaded.
-         */
-        currentUser = null;
-        currentProfile = null;
-        authStateInitialised = false;
-        applicationInitialised = false;
+        showToast(
+            error?.message ||
+            "Unable to sign in.",
+            "error"
+        );
 
         showLogin();
 
-        if (errorElement) {
-            errorElement.textContent =
-                error?.message ||
-                "Unable to sign in.";
-        }
-
     } finally {
-        setButtonLoading(
-            button,
-            false
-        );
+
+        isInitialising = false;
+
+        if (loginButton) {
+            loginButton.disabled = false;
+        }
     }
 }
-
 
 async function handleLogout() {
     try {
@@ -4047,205 +4080,211 @@ function initialiseFormEvents() {
    ========================================================= */
 
 async function initialise() {
-    if (isInitialising) {
-        return;
-    }
 
     /*
-     * If another path has already completed the application
-     * initialization, there is nothing else to do.
+     * ---------------------------------------------------------
+     * HARD DUPLICATE GUARD
+     * ---------------------------------------------------------
      */
-    if (applicationInitialised) {
+    if (applicationInitialised || isInitialising) {
+
+        console.log(
+            "Application initialisation already running/completed."
+        );
+
         return;
     }
 
     isInitialising = true;
 
     try {
+
+        console.log(
+            "Starting UHAS Asogli admin portal..."
+        );
+
         /*
-         * Attach all UI events exactly once.
+         * -----------------------------------------------------
+         * INITIALISE UI EVENTS FIRST
+         * -----------------------------------------------------
          */
+
         initialiseNavigation();
-
-        initialiseAllocationActions();
-
-        initialiseUnallocatedActions();
-
-        initialiseAdminManagementActions();
-
-        initialiseRoomActions();
-
-        initialiseSearchAndFilters();
-
-        initialiseButtons();
-
+        initialiseModals();
+        initialiseSearch();
+        initialiseFilters();
+        initialiseButtonHandlers();
+        initialiseKeyboardHandlers();
         initialiseFormEvents();
 
-        initialiseKeyboardHandlers();
+        /*
+         * -----------------------------------------------------
+         * GET CURRENT SESSION
+         * -----------------------------------------------------
+         */
 
+        const {
+            data: {
+                session
+            } = {},
+            error: sessionError
+        } = await supabase.auth.getSession();
+
+        if (sessionError) {
+            throw sessionError;
+        }
 
         /*
-         * Determine the existing authentication state.
+         * -----------------------------------------------------
+         * NO SESSION
+         * -----------------------------------------------------
          */
-        const session =
-            await getCurrentSession();
 
+        if (!session?.user) {
 
-        /*
-         * No authenticated session.
-         */
-        if (!session) {
+            console.log(
+                "No authenticated Supabase session."
+            );
+
             currentUser = null;
             currentProfile = null;
 
-            authStateInitialised =
-                false;
-
-            applicationInitialised =
-                false;
+            authStateInitialised = false;
+            applicationInitialised = false;
 
             showLogin();
 
             return;
         }
 
-
         /*
-         * Valid authenticated session.
+         * -----------------------------------------------------
+         * AUTHENTICATED USER
+         * -----------------------------------------------------
          */
+
         currentUser =
             session.user;
 
-
-        if (!currentUser) {
-            currentProfile = null;
-
-            authStateInitialised =
-                false;
-
-            applicationInitialised =
-                false;
-
-            showLogin();
-
-            return;
-        }
-
+        console.log(
+            "Authenticated user:",
+            currentUser.email
+        );
 
         /*
-         * Load profile.
-         *
-         * Profile failure is intentionally non-fatal.
+         * -----------------------------------------------------
+         * LOAD PROFILE
+         * -----------------------------------------------------
          */
+
         await loadCurrentProfile();
 
-
         /*
-         * Show application immediately.
+         * -----------------------------------------------------
+         * SHOW APP BEFORE DATA LOAD
+         * -----------------------------------------------------
          */
+
         showApp();
 
         updateRoleDisplay();
 
-
         /*
+         * -----------------------------------------------------
          * CRITICAL:
          *
-         * Mark authentication initialization as handled
-         * BEFORE starting data loads.
-         *
-         * This prevents the Supabase auth callback from
-         * starting a second initialization simultaneously.
+         * Mark the application as initialized BEFORE
+         * loading dashboard data.
+         * -----------------------------------------------------
          */
-        authStateInitialised =
-            true;
 
-        applicationInitialised =
-            true;
-
+        authStateInitialised = true;
+        applicationInitialised = true;
 
         /*
-         * Administrator management is auxiliary.
-         *
-         * It must NEVER prevent the main dashboard from
-         * appearing.
+         * -----------------------------------------------------
+         * ADMIN MANAGEMENT
+         * -----------------------------------------------------
          */
+
         try {
+
             await initialiseAdminManagement();
 
         } catch (error) {
+
             console.error(
-                "Admin management failed to initialise:",
+                "Admin management initialisation failed:",
                 error
             );
+
         }
 
-
         /*
-         * Main application data.
-         *
-         * loadEverything() already uses Promise.allSettled(),
-         * so one failed section cannot destroy the others.
+         * -----------------------------------------------------
+         * LOAD EVERYTHING
+         * -----------------------------------------------------
          */
+
         try {
+
             await loadEverything();
 
         } catch (error) {
+
             console.error(
-                "Main dashboard loading failed:",
+                "Dashboard loading failed:",
                 error
             );
+
         }
 
-
         /*
-         * Always leave the user on the dashboard after the
-         * initial authenticated load.
+         * -----------------------------------------------------
+         * SHOW DASHBOARD
+         * -----------------------------------------------------
          */
+
         activateSection(
             "dashboardSection"
         );
-
 
         console.log(
             "UHAS Asogli admin portal initialised successfully."
         );
 
     } catch (error) {
+
         console.error(
-            "Admin initialisation error:",
+            "Application initialisation error:",
             error
         );
 
-
         /*
-         * CRITICAL FIX:
-         *
-         * Do NOT hide an authenticated application merely
-         * because one initialization operation failed.
+         * DO NOT automatically hide the app if the user
+         * is authenticated.
          */
+
         if (currentUser) {
+
             showApp();
 
             showToast(
                 error?.message ||
-                "Some admin data could not be loaded.",
+                "Some application components could not be loaded.",
                 "error"
             );
 
         } else {
+
             showLogin();
 
-            showToast(
-                error?.message ||
-                "Unable to initialise the admin portal.",
-                "error"
-            );
         }
 
     } finally {
-        isInitialising =
-            false;
+
+        isInitialising = false;
+
     }
 }
 
@@ -4254,147 +4293,99 @@ async function initialise() {
    AUTH STATE CHANGES
    ========================================================= */
 
-supabase.auth.onAuthStateChange(
-    async (event, session) => {
-        try {
-            console.log(
-                "Supabase auth state:",
-                event,
-                session?.user?.email || "No session"
-            );
+/*
+ * IMPORTANT:
+ * The auth listener is deliberately kept very lightweight.
+ *
+ * Initial application loading is handled ONLY by initialise().
+ * Login loading is handled ONLY by handleLogin().
+ *
+ * This prevents:
+ *
+ *     SIGNED_IN
+ *          +
+ *     INITIAL_SESSION
+ *
+ * from triggering two complete application initialisations.
+ */
 
-            /*
-             * INITIAL_SESSION
-             *
-             * initialise() is responsible for the initial
-             * application load. Therefore we do NOT load the
-             * dashboard again here.
-             */
-            if (event === "INITIAL_SESSION") {
-                return;
-            }
+supabase.auth.onAuthStateChange((event, session) => {
 
+    console.log(
+        "Supabase auth state:",
+        event,
+        session?.user?.email || "No session"
+    );
 
-            /*
-             * SIGNED OUT
-             */
-            if (event === "SIGNED_OUT" || !session) {
-                currentUser = null;
-                currentProfile = null;
-
-                authStateInitialised = false;
-                applicationInitialised = false;
-                adminManagementInitialised = false;
-
-                showLogin();
-
-                return;
-            }
-
-
-            /*
-             * SIGNED IN
-             *
-             * This handles a genuine login event that occurs
-             * after the initial application load.
-             */
-            if (event === "SIGNED_IN") {
-
-                /*
-                 * handleLogin() already performs the complete
-                 * initialization after signInWithPassword().
-                 *
-                 * Do not repeat it here.
-                 */
-                if (
-                    applicationInitialised ||
-                    authStateInitialised
-                ) {
-                    return;
-                }
-
-
-                currentUser =
-                    session.user;
-
-
-                await loadCurrentProfile();
-
-
-                showApp();
-
-                updateRoleDisplay();
-
-
-                /*
-                 * Set these BEFORE loading remote data.
-                 * This prevents duplicate initialization.
-                 */
-                authStateInitialised =
-                    true;
-
-                applicationInitialised =
-                    true;
-
-
-                /*
-                 * Administrator management is optional.
-                 */
-                try {
-                    await initialiseAdminManagement();
-
-                } catch (error) {
-                    console.error(
-                        "Admin management initialisation failed:",
-                        error
-                    );
-                }
-
-
-                /*
-                 * Load dashboard data once.
-                 */
-                try {
-                    await loadEverything();
-
-                } catch (error) {
-                    console.error(
-                        "Dashboard loading failed:",
-                        error
-                    );
-                }
-
-
-                activateSection(
-                    "dashboardSection"
-                );
-            }
-
-
-        } catch (error) {
-
-            console.error(
-                "Auth state handling error:",
-                error
-            );
-
-
-            /*
-             * Never hide an authenticated application
-             * because of an auth callback error.
-             */
-            if (currentUser) {
-                showApp();
-
-                showToast(
-                    error?.message ||
-                    "Unable to process authentication state.",
-                    "error"
-                );
-            }
-        }
+    /*
+     * ---------------------------------------------------------
+     * INITIAL_SESSION
+     * ---------------------------------------------------------
+     *
+     * Do absolutely nothing here.
+     *
+     * initialise() is responsible for loading the application.
+     */
+    if (event === "INITIAL_SESSION") {
+        return;
     }
-);
+
+    /*
+     * ---------------------------------------------------------
+     * SIGNED_IN
+     * ---------------------------------------------------------
+     *
+     * Do NOT initialise anything here.
+     *
+     * handleLogin() is responsible for the login flow.
+     *
+     * This event is informational only.
+     */
+    if (event === "SIGNED_IN") {
+        return;
+    }
+
+    /*
+     * ---------------------------------------------------------
+     * TOKEN_REFRESHED
+     * ---------------------------------------------------------
+     *
+     * Nothing needs to be reloaded.
+     */
+    if (event === "TOKEN_REFRESHED") {
+        return;
+    }
+
+    /*
+     * ---------------------------------------------------------
+     * USER_UPDATED
+     * ---------------------------------------------------------
+     *
+     * Nothing needs to be reloaded.
+     */
+    if (event === "USER_UPDATED") {
+        return;
+    }
+
+    /*
+     * ---------------------------------------------------------
+     * SIGNED_OUT
+     * ---------------------------------------------------------
+     */
+    if (event === "SIGNED_OUT") {
+
+        currentUser = null;
+        currentProfile = null;
+
+        authStateInitialised = false;
+        applicationInitialised = false;
+        adminManagementInitialised = false;
+
+        showLogin();
+
+        return;
+    }
+});
 
 /* =========================================================
    START APPLICATION
@@ -4405,13 +4396,11 @@ if (
     "loading"
 ) {
     document.addEventListener(
-        "DOMContentLoaded",
-        initialise,
-        {
-            once: true
-        }
-    );
-
+    "DOMContentLoaded",
+    () => {
+        initialise();
+    }
+);
 } else {
     initialise();
 }
