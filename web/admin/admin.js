@@ -4081,17 +4081,10 @@ function initialiseFormEvents() {
 
 async function initialise() {
 
-    /*
-     * ---------------------------------------------------------
-     * HARD DUPLICATE GUARD
-     * ---------------------------------------------------------
-     */
     if (applicationInitialised || isInitialising) {
-
         console.log(
             "Application initialisation already running/completed."
         );
-
         return;
     }
 
@@ -4103,26 +4096,6 @@ async function initialise() {
             "Starting UHAS Asogli admin portal..."
         );
 
-        /*
-         * -----------------------------------------------------
-         * INITIALISE UI EVENTS FIRST
-         * -----------------------------------------------------
-         */
-
-        initialiseNavigation();
-        initialiseModals();
-        initialiseSearch();
-        initialiseFilters();
-        initialiseButtonHandlers();
-        initialiseKeyboardHandlers();
-        initialiseFormEvents();
-
-        /*
-         * -----------------------------------------------------
-         * GET CURRENT SESSION
-         * -----------------------------------------------------
-         */
-
         const {
             data: {
                 session
@@ -4133,12 +4106,6 @@ async function initialise() {
         if (sessionError) {
             throw sessionError;
         }
-
-        /*
-         * -----------------------------------------------------
-         * NO SESSION
-         * -----------------------------------------------------
-         */
 
         if (!session?.user) {
 
@@ -4157,55 +4124,25 @@ async function initialise() {
             return;
         }
 
-        /*
-         * -----------------------------------------------------
-         * AUTHENTICATED USER
-         * -----------------------------------------------------
-         */
-
-        currentUser =
-            session.user;
+        currentUser = session.user;
 
         console.log(
             "Authenticated user:",
             currentUser.email
         );
 
-        /*
-         * -----------------------------------------------------
-         * LOAD PROFILE
-         * -----------------------------------------------------
-         */
-
         await loadCurrentProfile();
-
-        /*
-         * -----------------------------------------------------
-         * SHOW APP BEFORE DATA LOAD
-         * -----------------------------------------------------
-         */
 
         showApp();
 
         updateRoleDisplay();
 
         /*
-         * -----------------------------------------------------
-         * CRITICAL:
-         *
-         * Mark the application as initialized BEFORE
-         * loading dashboard data.
-         * -----------------------------------------------------
+         * Mark initialized BEFORE loading the remaining data.
+         * This prevents duplicate initialization.
          */
-
         authStateInitialised = true;
         applicationInitialised = true;
-
-        /*
-         * -----------------------------------------------------
-         * ADMIN MANAGEMENT
-         * -----------------------------------------------------
-         */
 
         try {
 
@@ -4220,12 +4157,6 @@ async function initialise() {
 
         }
 
-        /*
-         * -----------------------------------------------------
-         * LOAD EVERYTHING
-         * -----------------------------------------------------
-         */
-
         try {
 
             await loadEverything();
@@ -4238,12 +4169,6 @@ async function initialise() {
             );
 
         }
-
-        /*
-         * -----------------------------------------------------
-         * SHOW DASHBOARD
-         * -----------------------------------------------------
-         */
 
         activateSection(
             "dashboardSection"
@@ -4259,11 +4184,6 @@ async function initialise() {
             "Application initialisation error:",
             error
         );
-
-        /*
-         * DO NOT automatically hide the app if the user
-         * is authenticated.
-         */
 
         if (currentUser) {
 
@@ -4287,7 +4207,6 @@ async function initialise() {
 
     }
 }
-
 
 /* =========================================================
    AUTH STATE CHANGES
