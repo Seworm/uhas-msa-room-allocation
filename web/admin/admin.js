@@ -2,8 +2,7 @@ import { supabase } from "../supabase.js";
 
 /* =========================================================
    UHAS ASOGLI HALL ROOM ALLOCATION
-   ADMIN PORTAL
-   PRODUCTION JAVASCRIPT
+   ADMIN PORTAL - PRODUCTION JAVASCRIPT
    ========================================================= */
 
 let currentUser = null;
@@ -108,7 +107,7 @@ function setButtonLoading(button, loading, loadingText = "Processing...") {
 }
 
 /* =========================================================
-   AUTHENTICATION & PROFILE
+   AUTHENTICATION & PROFILES
    ========================================================= */
 
 async function loadCurrentProfile() {
@@ -124,6 +123,7 @@ async function loadCurrentProfile() {
 
         if (error) {
             console.warn("Admin profile lookup failed:", error);
+            currentProfile = null;
             return null;
         }
 
@@ -131,6 +131,7 @@ async function loadCurrentProfile() {
         return currentProfile;
     } catch (error) {
         console.warn("Unable to load admin profile:", error);
+        currentProfile = null;
         return null;
     }
 }
@@ -210,7 +211,10 @@ async function handleLogin(event) {
 
         const { data, error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
-        if (!data?.user) throw new Error("No authenticated user was returned.");
+
+        if (!data?.user) {
+            throw new Error("Login succeeded but no authenticated user was returned.");
+        }
 
         currentUser = data.user;
         await loadCurrentProfile();
@@ -221,10 +225,20 @@ async function handleLogin(event) {
         authStateInitialised = true;
         applicationInitialised = true;
 
-        await initialiseAdminManagement();
-        await loadEverything();
-        setupRealtimeSubscriptions();
-        startAutoRefresh();
+        try {
+            await initialiseAdminManagement();
+        } catch (error) {
+            console.error("Admin management initialisation failed:", error);
+        }
+
+        try {
+            await loadEverything();
+            setupRealtimeSubscriptions();
+            startAutoRefresh();
+        } catch (error) {
+            console.error("Dashboard loading failed:", error);
+            showToast("Some dashboard data could not be loaded.", "error");
+        }
 
         activateSection("dashboardSection");
         showToast("Login successful.", "success");
@@ -297,12 +311,18 @@ async function handlePasswordReset(event) {
 
 async function callRpc(functionName, params = {}) {
     if (!functionName) throw new Error("RPC function name is missing.");
-    const { data, error } = await supabase.rpc(functionName, params);
-    if (error) {
-        console.error(`RPC ${functionName} failed:`, error);
+
+    try {
+        const { data, error } = await supabase.rpc(functionName, params);
+        if (error) {
+            console.error(`RPC ${functionName} failed:`, error);
+            throw error;
+        }
+        return data;
+    } catch (error) {
+        console.error(`RPC ${functionName} exception:`, error);
         throw error;
     }
-    return data;
 }
 
 /* =========================================================
@@ -328,9 +348,12 @@ async function loadDashboard() {
 
         setText("#allocationStatus", `${percentage}% Allocated`);
         setText("#lastUpdated", formatDate(new Date()));
+
     } catch (error) {
         console.error("Dashboard load error:", error);
-        ["#totalRooms", "#totalBeds", "#occupiedBeds", "#availableBeds", "#activeHolds", "#activeAllocations", "#unallocatedStudents"].forEach((s) => setText(s, "—"));
+        ["#totalRooms", "#totalBeds", "#occupiedBeds", "#availableBeds", "#activeHolds", "#activeAllocations", "#unallocatedStudents"].forEach((selector) => {
+            setText(selector, "—");
+        });
         setText("#allocationStatus", "Unavailable");
     }
 }
@@ -368,9 +391,13 @@ function renderRoomCard(room) {
     const available = Math.max(capacity - occupied, 0);
 
     let status = "available";
-    if (room.temporarily_locked) status = "locked";
-    else if (available === 0 && capacity > 0) status = "full";
-    else if (occupied > 0) status = "partial";
+    if (room.temporarily_locked) {
+        status = "locked";
+    } else if (available === 0 && capacity > 0) {
+        status = "full";
+    } else if (occupied > 0) {
+        status = "partial";
+    }
 
     const gender = room.gender || room.gender_rule || "Mixed";
 
@@ -398,21 +425,24 @@ function renderRoomCard(room) {
 }
 
 /* =========================================================
-   ROOM MODAL
+   ROOM MODAL (CLICK ROOM -> VIEW OCCUPANTS)
    ========================================================= */
 
 async function openRoomModal(roomId) {
     if (!roomId) return;
+
     const modal = $("#roomModal");
     const occupantsContainer = $("#roomOccupants");
     if (!modal || !occupantsContainer) return;
 
     const roomTitle = $("#modalRoomTitle");
     const roomSubtitle = $("#modalRoomSubtitle");
+
     if (roomTitle) roomTitle.textContent = "Room Occupants";
     if (roomSubtitle) roomSubtitle.textContent = "Loading...";
 
     occupantsContainer.innerHTML = `<div class="loading-state">Loading occupants...</div>`;
+
     modal.classList.add("open");
     modal.classList.remove("hidden");
     modal.style.display = "";
@@ -446,6 +476,7 @@ async function openRoomModal(roomId) {
                 `).join("")}
             </div>
         `;
+
     } catch (error) {
         console.error("Room occupants error:", error);
         occupantsContainer.innerHTML = `<div class="error-state">Unable to load room occupants.</div>`;
@@ -455,6 +486,7 @@ async function openRoomModal(roomId) {
 function closeRoomModal() {
     const modal = $("#roomModal");
     if (!modal) return;
+
     modal.classList.remove("open");
     modal.classList.add("hidden");
     modal.style.display = "none";
@@ -472,7 +504,7 @@ async function loadAllocations() {
     const gender = $("#genderFilter")?.value || "";
     const search = $("#studentSearch")?.value.trim() || "";
 
-    tbody.innerHTML = `<tr><td colspan="20">Loading allocations...</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="11">Loading allocations...</td></tr>`;
 
     try {
         const data = await callRpc("admin_student_allocations", {
@@ -482,15 +514,17 @@ async function loadAllocations() {
         });
 
         const allocations = Array.isArray(data) ? data : [];
+
         if (!allocations.length) {
-            tbody.innerHTML = `<tr><td colspan="20">No allocations found.</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="11">No allocations found.</td></tr>`;
             return;
         }
 
         tbody.innerHTML = allocations.map(renderAllocationRow).join("");
+
     } catch (error) {
         console.error("Allocations load error:", error);
-        tbody.innerHTML = `<tr><td colspan="20">Unable to load allocations.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="11">Unable to load allocations.</td></tr>`;
     }
 }
 
@@ -509,14 +543,19 @@ function renderAllocationRow(allocation) {
 
     return `
         <tr data-allocation-id="${escapeHtml(allocationId)}" data-student-id="${escapeHtml(studentUuid || studentId)}">
-            <td>${escapeHtml(studentNumber)}</td>
-            <td><strong>${escapeHtml(studentName)}</strong></td>
+            <td>${escapeHtml(allocation.allocation_number || studentNumber)}</td>
+            <td>
+                <strong>${escapeHtml(studentName)}</strong>
+                <small>${escapeHtml(studentNumber)}</small>
+            </td>
             <td>${escapeHtml(level)}</td>
+            <td>${escapeHtml(allocation.programme || "—")}</td>
             <td>${escapeHtml(gender)}</td>
             <td>${escapeHtml(block)}</td>
             <td>${escapeHtml(room)}</td>
             <td>${escapeHtml(bed)}</td>
             <td><span class="status-badge ${escapeHtml(normalise(status))}">${escapeHtml(status)}</span></td>
+            <td>${escapeHtml(formatDate(allocation.allocated_at || allocation.created_at))}</td>
             <td>
                 <div class="table-actions">
                     <button type="button" class="btn btn-small btn-secondary allocation-reassign" data-allocation-id="${escapeHtml(allocationId)}" data-student-id="${escapeHtml(studentUuid || studentId)}" data-current-bed-id="${escapeHtml(allocation.bed_id || allocation.current_bed_id || "")}">Reassign</button>
@@ -543,14 +582,15 @@ async function reassignAllocation(allocationId, currentBedId) {
     const row = document.querySelector(`tr[data-allocation-id="${CSS.escape(String(allocationId))}"]`);
     if (row) {
         const cells = row.querySelectorAll("td");
-        if (cells.length >= 4) gender = cells[3]?.textContent.trim() || "";
+        if (cells.length >= 5) gender = cells[4]?.textContent.trim() || "";
     }
 
     try {
         const beds = await getAvailableBeds(gender);
         if (!beds.length) return showToast("There are no available beds for this student.", "error");
 
-        const options = beds.map((bed, i) => `${i + 1}. ${bed.room_code || bed.room_number || "Room"} · ${bed.bed_code || bed.bed_number || "Bed"}`).join("\n");
+        const options = beds.map((bed, index) => `${index + 1}. ${bed.room_code || bed.room_number || "Room"} · ${bed.bed_code || bed.bed_number || "Bed"}`).join("\n");
+
         const answer = window.prompt(`Select the new bed by entering its number:\n\n${options}`);
         if (answer === null) return;
 
@@ -616,21 +656,21 @@ async function loadUnallocated() {
     if (!tbody) return;
 
     const search = $("#unallocatedSearch")?.value.trim() || "";
-    tbody.innerHTML = `<tr><td colspan="20">Loading unallocated students...</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="8">Loading unallocated students...</td></tr>`;
 
     try {
         const data = await callRpc("admin_unallocated_students", { p_search: search || null });
         const students = Array.isArray(data) ? data : [];
 
         if (!students.length) {
-            tbody.innerHTML = `<tr><td colspan="20">${search ? "No unallocated students match your search." : "No unallocated students found."}</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="8">${search ? "No unallocated students match your search." : "No unallocated students found."}</td></tr>`;
             return;
         }
 
         tbody.innerHTML = students.map(renderUnallocatedRow).join("");
     } catch (error) {
         console.error("Unallocated students load error:", error);
-        tbody.innerHTML = `<tr><td colspan="20">Unable to load unallocated students.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="8">Unable to load unallocated students.</td></tr>`;
         showToast(error?.message || "Unable to load unallocated students.", "error");
     }
 }
@@ -643,16 +683,18 @@ function renderUnallocatedRow(student) {
     const level = student.level || "—";
     const programme = student.programme || "—";
     const gender = student.gender || "—";
+    const priority = student.priority_group || "—";
     const email = student.email || "—";
     const assignId = studentUuid || student.id || student.student_id || "";
 
     return `
         <tr data-student-id="${escapeHtml(rowId)}">
-            <td>${escapeHtml(studentNumber)}</td>
             <td><strong>${escapeHtml(studentName)}</strong></td>
+            <td>${escapeHtml(studentNumber)}</td>
             <td>${escapeHtml(level)}</td>
             <td>${escapeHtml(programme)}</td>
             <td>${escapeHtml(gender)}</td>
+            <td>${escapeHtml(priority)}</td>
             <td>${escapeHtml(email)}</td>
             <td>
                 <button type="button" class="btn btn-small btn-primary assign-unallocated" data-student-id="${escapeHtml(assignId)}" data-student-number="${escapeHtml(studentNumber)}" data-student-gender="${escapeHtml(gender)}">Assign Room</button>
@@ -677,7 +719,8 @@ async function assignUnallocatedStudent(studentId, genderFromButton = "") {
         const beds = await getAvailableBeds(gender);
         if (!beds.length) return showToast("There are no available beds for this student.", "error");
 
-        const options = beds.map((bed, i) => `${i + 1}. ${bed.room_code || bed.room_number || "Room"} · ${bed.bed_code || bed.bed_number || "Bed"}${bed.block ? ` · ${bed.block}` : ""}`).join("\n");
+        const options = beds.map((bed, index) => `${index + 1}. ${bed.room_code || bed.room_number || "Room"} · ${bed.bed_code || bed.bed_number || "Bed"}`).join("\n");
+
         const answer = window.prompt(`Select the bed to assign:\n\n${options}`);
         if (answer === null) return;
 
@@ -708,14 +751,14 @@ async function loadAuditLogs() {
     const tbody = $("#auditTable");
     if (!tbody) return;
 
-    tbody.innerHTML = `<tr><td colspan="20">Loading audit logs...</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="5">Loading audit logs...</td></tr>`;
 
     try {
         const data = await callRpc("admin_audit_logs", { p_limit: 100 });
         const logs = Array.isArray(data) ? data : [];
 
         if (!logs.length) {
-            tbody.innerHTML = `<tr><td colspan="20">No audit records found.</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="5">No audit records found.</td></tr>`;
             return;
         }
 
@@ -723,14 +766,14 @@ async function loadAuditLogs() {
             <tr>
                 <td>${escapeHtml(formatDate(log.created_at || log.timestamp))}</td>
                 <td>${escapeHtml(log.action || log.event || "—")}</td>
-                <td>${escapeHtml(log.target || log.target_type || log.actor_email || "—")}</td>
-                <td>${escapeHtml(log.target_id || log.entity_id || "—")}</td>
+                <td>${escapeHtml(log.actor_email || log.user_email || "—")}</td>
+                <td>${escapeHtml(log.target || log.target_type || "—")}</td>
                 <td>${escapeHtml(typeof log.details === "object" ? JSON.stringify(log.details) : (log.details || log.description || ""))}</td>
             </tr>
         `).join("");
     } catch (error) {
         console.error("Audit log error:", error);
-        tbody.innerHTML = `<tr><td colspan="20">Unable to load audit logs.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="5">Unable to load audit logs.</td></tr>`;
     }
 }
 
@@ -761,7 +804,7 @@ function startAutoRefresh() {
     stopAutoRefresh();
     autoRefreshTimer = window.setInterval(() => {
         loadEverything();
-    }, 30000); // Auto refresh every 30 seconds
+    }, 30000);
 }
 
 function stopAutoRefresh() {
@@ -821,13 +864,14 @@ async function exportAllocations() {
         const data = await callRpc("admin_student_allocations", { p_search: search || null, p_block: block || null, p_gender: gender || null });
         const allocations = Array.isArray(data) ? data : [];
 
-        const rows = [["Allocation Number", "Student Name", "Student ID", "Level", "Gender", "Block", "Room", "Bed", "Status", "Allocated At"]];
+        const rows = [["Allocation Number", "Student Name", "Student ID", "Level", "Programme", "Gender", "Block", "Room", "Bed", "Status", "Allocated At"]];
         allocations.forEach((item) => {
             rows.push([
                 item.allocation_number || "",
                 item.student_name || "",
                 item.student_number || item.student_id_number || item.student_id || "",
                 item.level || "",
+                item.programme || "",
                 item.gender || "",
                 item.block || "",
                 item.room_code || item.room_number || "",
@@ -851,7 +895,7 @@ async function exportUnallocated() {
         const data = await callRpc("admin_unallocated_students", { p_search: search || null });
         const students = Array.isArray(data) ? data : [];
 
-        const rows = [["Student Name", "Student ID", "Level", "Programme", "Gender", "Email"]];
+        const rows = [["Student Name", "Student ID", "Level", "Programme", "Gender", "Priority Group", "Email"]];
         students.forEach((student) => {
             rows.push([
                 student.student_name || student.full_name || "",
@@ -859,6 +903,7 @@ async function exportUnallocated() {
                 student.level || "",
                 student.programme || "",
                 student.gender || "",
+                student.priority_group || "",
                 student.email || ""
             ]);
         });
@@ -927,7 +972,7 @@ function initialiseNavigation() {
 }
 
 /* =========================================================
-   ROBUST DROPDOWNS & FILTER HANDLERS
+   DROPDOWNS & FILTER HANDLERS
    ========================================================= */
 
 function initialiseSearchAndFilters() {
@@ -989,7 +1034,7 @@ async function loadAdministrators() {
     const tbody = $("#administratorsTableBody");
     if (!tbody) return;
 
-    tbody.innerHTML = `<tr><td colspan="10">Loading administrators...</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="4">Loading administrators...</td></tr>`;
 
     try {
         const { data, error } = await supabase.functions.invoke("admin-management", { body: { action: "list" } });
@@ -997,7 +1042,7 @@ async function loadAdministrators() {
 
         const administrators = Array.isArray(data) ? data : Array.isArray(data?.administrators) ? data.administrators : [];
         if (!administrators.length) {
-            tbody.innerHTML = `<tr><td colspan="10">No administrators found.</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="4">No administrators found.</td></tr>`;
             return;
         }
 
@@ -1016,7 +1061,7 @@ async function loadAdministrators() {
         `).join("");
     } catch (error) {
         console.error("Administrator load error:", error);
-        tbody.innerHTML = `<tr><td colspan="10">Unable to load administrators.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="4">Unable to load administrators.</td></tr>`;
     }
 }
 
@@ -1236,6 +1281,7 @@ async function initialise() {
         startAutoRefresh();
 
         activateSection("dashboardSection");
+
     } catch (error) {
         console.error("Application initialisation error:", error);
         if (currentUser) {
