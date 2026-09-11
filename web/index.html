@@ -1,36 +1,34 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8">
+    <meta charset="utf-8">
 
-  <meta
-    name="viewport"
-    content="width=device-width, initial-scale=1"
-  >
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1"
+    >
 
-  <meta
-    name="theme-color"
-    content="#075b3a"
-  >
+    <meta
+        name="theme-color"
+        content="#075b3a"
+    >
 
-  <meta
-    name="description"
-    content="UHAS Asogli Hall student accommodation room allocation portal."
-  >
+    <meta
+        name="description"
+        content="UHAS Asogli Hall student accommodation room allocation portal."
+    >
 
-  <title>UHAS Asogli Hall Room Allocation</title>
+    <title>UHAS Asogli Hall Room Allocation</title>
 
-  <link rel="stylesheet" href="styles.css">
+    <link
+        rel="stylesheet"
+        href="styles.css"
+    >
 </head>
 
 <body>
 
-  <!--
-    The application header and progress indicator
-    are created dynamically by app.js.
-  -->
-
-  <main>
+<main>
 
     <!-- =====================================================
          STUDENT LOGIN
@@ -38,189 +36,189 @@
 
     <section id="login">
 
-      <header>
-        <h1>Room allocation, simplified.</h1>
+        <header>
+            <h1>Room allocation, simplified.</h1>
 
-        <p>
-          Securely access your UHAS Asogli Hall accommodation
-          allocation portal.
-        </p>
-      </header>
+            <p>
+                Securely access your UHAS Asogli Hall accommodation
+                allocation portal.
+            </p>
+        </header>
 
-      <div class="info-strip">
+        <div class="info-strip">
 
-        <div class="info-item">
-          <small>Portal</small>
-          <strong>Asogli Hall</strong>
+            <div class="info-item">
+                <small>Portal</small>
+                <strong>Asogli Hall</strong>
+            </div>
+
+            <div class="info-item">
+                <small>Access</small>
+                <strong>Student Self-Service</strong>
+            </div>
+
         </div>
 
-        <div class="info-item">
-          <small>Access</small>
-          <strong>Student Self-Service</strong>
-        </div>
+        <label for="index">
+            Index Number
+        </label>
 
-      </div>
+        <input
+            id="index"
+            type="text"
+            inputmode="text"
+            autocomplete="username"
+            autocapitalize="characters"
+            spellcheck="false"
+            placeholder="e.g. UHAS202400001"
+            aria-describedby="msg"
+        >
 
-      <label for="index">
-        Index Number
-      </label>
+        <label for="accessCode">
+            Unique Access Code
+        </label>
 
-      <input
-        id="index"
-        type="text"
-        inputmode="text"
-        autocomplete="username"
-        autocapitalize="characters"
-        spellcheck="false"
-        placeholder="e.g. UHAS202400001"
-        aria-describedby="msg"
-      >
+        <input
+            id="accessCode"
+            type="password"
+            autocomplete="current-password"
+            placeholder="Enter your access code"
+            aria-describedby="msg"
+        >
 
-      <label for="accessCode">
-        Unique Access Code
-      </label>
+        <button
+            id="loginButton"
+            type="button"
+        >
+            Continue
+        </button>
 
-      <input
-        id="accessCode"
-        type="password"
-        autocomplete="current-password"
-        placeholder="Enter your access code"
-        aria-describedby="msg"
-      >
-
-      <button
-        id="loginButton"
-        type="button"
-      >
-        Continue
-      </button>
-
-      <p
-        id="msg"
-        role="alert"
-        aria-live="polite"
-      ></p>
+        <p
+            id="msg"
+            role="alert"
+            aria-live="polite"
+        ></p>
 
     </section>
 
 
     <!-- =====================================================
-         GENDER SELECTION
+         STUDENT PROFILE
          ===================================================== -->
 
-    <!-- =====================================================
-     STUDENT PROFILE
-     ===================================================== -->
-
-<section
-  id="genderSelection"
-  hidden
->
-
-  <div class="section-heading">
-
-    <div>
-      <h2>Complete your profile</h2>
-
-      <p>
-        Enter your phone number and confirm your
-        accommodation details to continue.
-      </p>
-    </div>
-
-  </div>
-
-
-  <!-- PHONE NUMBER -->
-
-  <div class="profile-field">
-
-    <label for="phoneNumber">
-      Phone Number
-    </label>
-
-    <input
-      id="phoneNumber"
-      type="tel"
-      inputmode="tel"
-      autocomplete="tel"
-      placeholder="e.g. 0241234567"
-      aria-describedby="phoneHelp genderMessage"
+    <section
+        id="genderSelection"
+        hidden
     >
 
-    <small id="phoneHelp">
-      Use a Ghanaian mobile number, e.g. 0241234567
-      or +233241234567.
-    </small>
+        <div class="section-heading">
 
-  </div>
+            <div>
+                <h2>Complete your profile</h2>
 
+                <p>
+                    Enter your phone number and confirm your
+                    accommodation details to continue.
+                </p>
+            </div>
 
-  <!-- GENDER -->
-
-  <div
-    id="genderChoices"
-    class="profile-gender"
-  >
-
-    <h3>Gender</h3>
-
-    <p>
-      Select your gender to determine eligible
-      accommodation.
-    </p>
-
-    <div class="choices">
-
-      <button
-        type="button"
-        class="choice-button gender-choice"
-        data-gender="MALE"
-      >
-        <strong>Male</strong>
-
-        <span>
-          Select male accommodation
-        </span>
-      </button>
-
-      <button
-        type="button"
-        class="choice-button gender-choice"
-        data-gender="FEMALE"
-      >
-        <strong>Female</strong>
-
-        <span>
-          Select female accommodation
-        </span>
-      </button>
-
-    </div>
-
-  </div>
+        </div>
 
 
-  <!-- Existing gender students need only save phone -->
+        <!-- PHONE NUMBER -->
 
-  <button
-    id="savePhoneButton"
-    type="button"
-    class="primary-action"
-    hidden
-  >
-    Save phone number
-    <span aria-hidden="true">→</span>
-  </button>
+        <div class="profile-field">
+
+            <label for="phoneNumber">
+                Phone Number
+            </label>
+
+            <input
+                id="phoneNumber"
+                type="tel"
+                inputmode="tel"
+                autocomplete="tel"
+                placeholder="e.g. 0241234567"
+                aria-describedby="phoneHelp genderMessage"
+            >
+
+            <small id="phoneHelp">
+                Use a Ghanaian mobile number, e.g. 0241234567
+                or +233241234567.
+            </small>
+
+        </div>
 
 
-  <p
-    id="genderMessage"
-    role="alert"
-    aria-live="polite"
-  ></p>
+        <!-- GENDER -->
 
-</section>
+        <div
+            id="genderChoices"
+            class="profile-gender"
+        >
+
+            <h3>Gender</h3>
+
+            <p>
+                Select your gender to determine eligible
+                accommodation.
+            </p>
+
+            <div class="choices">
+
+                <button
+                    type="button"
+                    class="choice-button gender-choice"
+                    data-gender="MALE"
+                >
+                    <strong>Male</strong>
+
+                    <span>
+                        Select male accommodation
+                    </span>
+                </button>
+
+
+                <button
+                    type="button"
+                    class="choice-button gender-choice"
+                    data-gender="FEMALE"
+                >
+                    <strong>Female</strong>
+
+                    <span>
+                        Select female accommodation
+                    </span>
+                </button>
+
+            </div>
+
+        </div>
+
+
+        <!-- EXISTING GENDER STUDENTS -->
+
+        <button
+            id="savePhoneButton"
+            type="button"
+            class="primary-action"
+            hidden
+        >
+            Save phone number
+
+            <span aria-hidden="true">
+                →
+            </span>
+        </button>
+
+
+        <p
+            id="genderMessage"
+            role="alert"
+            aria-live="polite"
+        ></p>
+
+    </section>
 
 
     <!-- =====================================================
@@ -228,79 +226,84 @@
          ===================================================== -->
 
     <section
-      id="blockSelection"
-      hidden
+        id="blockSelection"
+        hidden
     >
 
-      <div class="section-heading">
+        <div class="section-heading">
 
-        <div>
-          <h2>Choose your block</h2>
+            <div>
+                <h2>Choose your block</h2>
 
-          <p>
-            Select a hostel block to view its available rooms.
-          </p>
+                <p>
+                    Select a hostel block to view its available rooms.
+                </p>
+            </div>
+
         </div>
 
-      </div>
 
-      <div class="choices">
+        <div class="choices">
 
-        <button
-          type="button"
-          class="choice-button block-choice"
-          data-block="Ahoe"
-        >
-          <strong>Ahoe</strong>
+            <button
+                type="button"
+                class="choice-button block-choice"
+                data-block="Ahoe"
+            >
+                <strong>Ahoe</strong>
 
-          <span>
-            View available Ahoe rooms
-          </span>
-        </button>
+                <span>
+                    View available Ahoe rooms
+                </span>
+            </button>
 
-        <button
-          type="button"
-          class="choice-button block-choice"
-          data-block="Bankoe"
-        >
-          <strong>Bankoe</strong>
 
-          <span>
-            View available Bankoe rooms
-          </span>
-        </button>
+            <button
+                type="button"
+                class="choice-button block-choice"
+                data-block="Bankoe"
+            >
+                <strong>Bankoe</strong>
 
-        <button
-          type="button"
-          class="choice-button block-choice"
-          data-block="Dome"
-        >
-          <strong>Dome</strong>
+                <span>
+                    View available Bankoe rooms
+                </span>
+            </button>
 
-          <span>
-            View available Dome rooms
-          </span>
-        </button>
 
-        <button
-          type="button"
-          class="choice-button block-choice"
-          data-block="Hliha"
-        >
-          <strong>Hliha</strong>
+            <button
+                type="button"
+                class="choice-button block-choice"
+                data-block="Dome"
+            >
+                <strong>Dome</strong>
 
-          <span>
-            View available Hliha rooms
-          </span>
-        </button>
+                <span>
+                    View available Dome rooms
+                </span>
+            </button>
 
-      </div>
 
-      <p
-        id="blockMessage"
-        role="alert"
-        aria-live="polite"
-      ></p>
+            <button
+                type="button"
+                class="choice-button block-choice"
+                data-block="Hliha"
+            >
+                <strong>Hliha</strong>
+
+                <span>
+                    View available Hliha rooms
+                </span>
+            </button>
+
+        </div>
+
+
+        <p
+            id="blockMessage"
+            role="alert"
+            aria-live="polite"
+        ></p>
 
     </section>
 
@@ -310,35 +313,37 @@
          ===================================================== -->
 
     <section
-      id="rooms"
-      hidden
+        id="rooms"
+        hidden
     >
 
-      <div class="section-heading">
+        <div class="section-heading">
 
-        <div>
-          <h2>Choose your room</h2>
+            <div>
+                <h2>Choose your room</h2>
 
-          <p id="roomSubtitle">
-            Available rooms will appear here.
-          </p>
+                <p id="roomSubtitle">
+                    Available rooms will appear here.
+                </p>
+            </div>
+
+
+            <button
+                id="changeBlockButton"
+                type="button"
+                class="secondary-button"
+            >
+                Change Block
+            </button>
+
         </div>
 
-        <button
-          id="changeBlockButton"
-          type="button"
-          class="secondary-button"
-        >
-          Change Block
-        </button>
 
-      </div>
-
-      <div
-        id="grid"
-        class="grid"
-        aria-live="polite"
-      ></div>
+        <div
+            id="grid"
+            class="grid"
+            aria-live="polite"
+        ></div>
 
     </section>
 
@@ -348,30 +353,30 @@
          ===================================================== -->
 
     <section
-      id="allocation"
-      hidden
+        id="allocation"
+        hidden
     ></section>
 
-  </main>
+</main>
 
 
-  <!-- =======================================================
-       FOOTER
-       ======================================================= -->
+<!-- =========================================================
+     FOOTER
+     ========================================================= -->
 
-  <footer>
+<footer>
     UHAS Asogli Hall Room Allocation Portal
-  </footer>
+</footer>
 
 
-  <!-- =======================================================
-       APPLICATION
-       ======================================================= -->
+<!-- =========================================================
+     APPLICATION
+     ========================================================= -->
 
-  <script
+<script
     type="module"
     src="app.js"
-  ></script>
+></script>
 
 </body>
 </html>
